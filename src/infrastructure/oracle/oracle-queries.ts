@@ -5,6 +5,7 @@ import type { OracleConnection } from "./oracle-connection.js";
 // Retorna linhas cruas (colunas em MAIÚSCULO); a transformação em DTO fica no provider.
 
 export interface TableRow { OWNER: string; TABLE_NAME: string; NUM_ROWS: number | null }
+export interface ViewRow { OWNER: string; VIEW_NAME: string }
 export interface ColumnRow {
   COLUMN_NAME: string; DATA_TYPE: string; NULLABLE: string; DATA_LENGTH: number;
   DATA_PRECISION: number | null; DATA_SCALE: number | null; DATA_DEFAULT: string | null;
@@ -71,6 +72,36 @@ export class OracleQueries {
         WHERE ${oc.sql} AND UPPER(t.table_name) = UPPER(:tab)`,
       { ...oc.binds, tab: table },
     );
+  }
+
+  findViews(schema?: string, pattern?: string): Promise<ViewRow[]> {
+    const oc = this.ownerClause("v", schema);
+    return this.conn.query<ViewRow>(
+      `SELECT v.owner, v.view_name
+         FROM all_views v
+        WHERE ${oc.sql}
+          ${pattern ? "AND UPPER(v.view_name) LIKE UPPER(:pat)" : ""}
+        ORDER BY v.owner, v.view_name`,
+      pattern ? { ...oc.binds, pat: `%${pattern}%` } : oc.binds,
+    );
+  }
+
+  findViewOwners(view: string): Promise<{ OWNER: string }[]> {
+    const oc = this.ownerClause("v");
+    return this.conn.query<{ OWNER: string }>(
+      `SELECT v.owner FROM all_views v
+        WHERE ${oc.sql} AND UPPER(v.view_name) = UPPER(:vw)`,
+      { ...oc.binds, vw: view },
+    );
+  }
+
+  async findViewText(owner: string, view: string): Promise<string> {
+    // ALL_VIEWS.TEXT é LONG; node-oracledb o retorna como string por padrão.
+    const rows = await this.conn.query<{ TEXT: string | null }>(
+      `SELECT text FROM all_views WHERE owner = :owner AND view_name = :vw`,
+      { owner, vw: view },
+    );
+    return rows[0]?.TEXT?.trim() ?? "";
   }
 
   findColumns(owner: string, table: string): Promise<ColumnRow[]> {
@@ -148,11 +179,11 @@ export class OracleQueries {
     );
   }
 
-  async findLastDdlTime(owner: string, table: string): Promise<string | undefined> {
+  async findLastDdlTime(owner: string, name: string, objectType = "TABLE"): Promise<string | undefined> {
     const rows = await this.conn.query<{ LAST_DDL_TIME: Date }>(
       `SELECT last_ddl_time FROM all_objects
-        WHERE owner = :owner AND object_name = :tab AND object_type = 'TABLE'`,
-      { owner, tab: table },
+        WHERE owner = :owner AND object_name = :tab AND object_type = :otype`,
+      { owner, tab: name, otype: objectType },
     );
     return rows[0]?.LAST_DDL_TIME?.toISOString();
   }

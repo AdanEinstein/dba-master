@@ -1,6 +1,8 @@
 import type {
   TableRef,
   TableSchema,
+  ViewRef,
+  ViewSchema,
   Relationships,
   DdlResult,
   ProcedureRef,
@@ -32,6 +34,10 @@ export interface DatabaseProvider {
   /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */
   describeTable(table: string, schema?: string): Promise<TableSchema>;
   getRelationships(table: string, schema?: string): Promise<Relationships>;
+  /** Lista views (owner, nome), opcionalmente filtrando por substring do nome. */
+  listViews(schema?: string, pattern?: string): Promise<ViewRef[]>;
+  /** Descreve a view: colunas + o SELECT que a define. */
+  describeView(view: string, schema?: string): Promise<ViewSchema>;
   getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult>;
   listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]>;
   listPackages(schema?: string, pattern?: string): Promise<PackageRef[]>;
