@@ -10,27 +10,26 @@ Ambas as vias são **subcomandos da própria bin** (via `npx`, sem clonar o repo
 4 agentes: `claude` · `copilot` · `opencode` · `antigravity`. Qualquer outro cliente MCP
 funciona manualmente (ver fim) — o server é STDIO padrão.
 
-## 1. Servidor MCP
+## Instalação Unificada (Interativa)
 
-Registra o comando `npx -y dba-master`. As credenciais vêm do ambiente e são gravadas no
-bloco `env` de cada config (o pacote npx não tem `.env` ao lado); se ausentes, viram
-placeholders `<VAR>` para editar depois.
+O novo instalador interativo configura tanto o servidor MCP quanto as skills/comandos para os agentes que você escolher.
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install-mcp                 # todos os agentes
-  npx -y dba-master install-mcp --agent claude  # só um
+  npx -y dba-master install
 ```
 
-Destinos do config (só globais, no `~`):
+Siga as instruções na tela para selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity). As credenciais vêm do ambiente e são gravadas no bloco `env` de cada config; se ausentes, viram placeholders `<VAR>` para editar depois.
 
-| Agente          | Arquivo                                  | Tipo |
-| --------------- | ---------------------------------------- | ---- |
-| Claude Desktop  | `~/.claude/claude_desktop_config.json`   | stdio |
-| Claude Code     | `~/.claude.json` (user scope)            | stdio |
-| Copilot CLI     | `~/.copilot/mcp-config.json`             | local |
-| Opencode        | `~/.config/opencode/opencode.json`       | local |
-| Antigravity     | `~/.gemini/config/mcp_config.json`       | stdio |
+### Destinos do config (só globais, no `~`):
+
+| Agente          | Arquivo MCP                              | Arquivo de Skill/Command                       |
+| --------------- | ---------------------------------------- | ---------------------------------------------- |
+| Claude Desktop  | `~/.claude/claude_desktop_config.json`   | N/A                                            |
+| Claude Code     | `~/.claude.json` (user scope)            | `~/.claude/commands/dba-investigate.md`        |
+| Copilot CLI     | `~/.copilot/mcp-config.json`             | `~/.copilot/skills/dba-investigate/SKILL.md`   |
+| Opencode        | `~/.config/opencode/opencode.json`       | `~/.config/opencode/command/dba-investigate.md`|
+| Antigravity     | `~/.gemini/config/mcp_config.json`       | `~/.gemini/workflows/dba-investigate.md`       |
 
 **Claude Code** — alternativa via CLI:
 ```bash
@@ -48,29 +47,9 @@ Transporte STDIO padrão. Cole no config MCP do agente (credenciais no `env`):
 { "command": "npx", "args": ["-y", "dba-master"], "env": { "DB_USER": "...", "DB_PASSWORD": "...", "DB_CONNECT_STRING": "host:1521/service_name" } }
 ```
 
-Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli),
-`servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
+Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli), `servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
 
-## 2. Skill/comando `dba-investigate`
-
-Subcomando análogo, sem credenciais:
-
-```bash
-npx -y dba-master install-agents                 # todos
-npx -y dba-master install-agents --agent claude  # só um
-```
-
-Fonte em `agents/commands/dba-investigate.md`. Cada agente recebe o formato nativo:
-
-| Agente      | Destino                                        | Formato        |
-| ----------- | ---------------------------------------------- | -------------- |
-| Claude Code | `~/.claude/commands/dba-investigate.md`        | slash command  |
-| Copilot     | `~/.copilot/skills/dba-investigate/SKILL.md`   | skill pessoal  |
-| Opencode    | `~/.config/opencode/command/dba-investigate.md`| command        |
-| Antigravity | `~/.gemini/workflows/dba-investigate.md`       | workflow ⚠️ path não-doc |
-
-> Antigravity sem `~/.gemini`: crie o workflow pela UI (Customizations → Workflows)
-> com o conteúdo de `agents/commands/dba-investigate.md`.
+> Antigravity sem `~/.gemini`: crie o workflow pela UI (Customizations → Workflows) com o conteúdo de `agents/commands/dba-investigate.md`.
 
 ## 3. Pós-instalação
 
