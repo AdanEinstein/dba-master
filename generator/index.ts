@@ -1,11 +1,11 @@
-import { intro, outro, spinner, log } from "@clack/prompts";
+import { intro, outro, spinner, log, select, isCancel } from "@clack/prompts";
 import cfonts from "cfonts";
 
 import { loadConfig } from "../src/config.js";
 import { ProviderManager } from "../src/infrastructure/provider-manager.js";
 import { generateInterfaces } from "./schema-compiler.js";
 
-// Subcomando `npx dba-master generate`: compila as interfaces .ts do schema, standalone.
+// Subcomando `npx -y dba-master@latest generate`: compila as interfaces .ts do schema, standalone.
 // UI animada no mesmo estilo do setup (cfonts + spinner @clack).
 export async function runGenerate(args: string[]): Promise<void> {
   const flag = (name: string) => {
@@ -37,11 +37,28 @@ export async function runGenerate(args: string[]): Promise<void> {
 
   const cfg = loadConfig();
   const mgr = new ProviderManager(cfg);
+
+  let selectedConnection = connection;
+  if (!selectedConnection) {
+    const available = mgr.getAvailableConnections();
+    if (available.length > 1) {
+      const result = await select({
+        message: "Múltiplas conexões disponíveis. Qual deseja utilizar?",
+        options: available.map((c) => ({ value: c, label: c })),
+      });
+      if (isCancel(result)) {
+        log.warn("Operação cancelada.");
+        process.exit(0);
+      }
+      selectedConnection = result as string;
+    }
+  }
+
   const s = spinner();
 
   try {
-    const db = mgr.getProvider(connection);
-    const resolvedName = mgr.resolveConnectionName(connection);
+    const db = mgr.getProvider(selectedConnection);
+    const resolvedName = mgr.resolveConnectionName(selectedConnection);
     s.start("Lendo schema...");
 
     const r = await generateInterfaces(db, cfg.cacheDir, resolvedName, {

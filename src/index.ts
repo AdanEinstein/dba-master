@@ -39,6 +39,26 @@ if (process.argv[2] === "generate") {
   process.exit(0);
 }
 
+if (process.argv[2] === "help" || process.argv[2] === "--help" || process.argv[2] === "-h") {
+  console.log(`
+Uso: npx -y dba-master@latest [comando]
+
+Comandos disponíveis:
+  install      Instala e configura o MCP Server nos agentes de IA.
+  uninstall    Remove o MCP Server dos agentes de IA.
+  configure    Gerencia as credenciais e configurações de banco de dados (connections.json).
+  generate     Compila as interfaces TypeScript do schema do banco de dados (standalone).
+                 --schema <nome>      (Opcional) Especifica um schema
+                 --connection <nome>  (Opcional) Conexão a ser usada
+                 --no-views           (Opcional) Ignora a compilação de views
+                 --force              (Opcional) Força a recompilação
+  help         Mostra esta mensagem de ajuda.
+
+Se nenhum comando for passado, o processo iniciará o MCP Server em stdio (para consumo pelos agentes).
+`);
+  process.exit(0);
+}
+
 // Composition root: config → provider (adapter) → tools. Trocar de banco é só o DB_ENGINE.
 
 const cfg = loadConfig();

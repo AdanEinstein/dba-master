@@ -49,5 +49,5 @@ se houver mudança. A resposta inclui `cacheFile` com o caminho gerado.
 Passe `force: true` (ou `--force` no CLI) para ignorar o cache e reescrever tudo (já não é mais estritamente necessário para sincronizar FKs de entrada, pois o hash já captura essa alteração).
 
 Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou
-`npx dba-master generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em
+`npx -y dba-master@latest generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em
 [arquitetura.md](arquitetura.md).

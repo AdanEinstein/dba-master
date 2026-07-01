@@ -12,23 +12,16 @@ const KEY = "dba-master";
 const COMMAND = "npx";
 const ARGS = ["-y", "dba-master"];
 
-// Credenciais para o bloco env. Obrigatórias viram placeholder se ausentes no ambiente.
-const REQUIRED = ["DB_USER", "DB_PASSWORD", "DB_CONNECT_STRING"];
-const OPTIONAL = ["DB_ENGINE", "DB_CLIENT_MODE", "SCHEMA_FILTER", "READ_ONLY"];
-let usedPlaceholder = false;
+// Variáveis opcionais para o bloco env do MCP.
+const OPTIONAL = ["SCHEMA_FILTER", "READ_ONLY"];
 
-function envBlock(): Record<string, string> {
+function envBlock(): Record<string, string> | undefined {
   const env: Record<string, string> = {};
-  for (const k of REQUIRED) {
-    const v = process.env[k];
-    if (v) env[k] = v;
-    else { env[k] = `<${k}>`; usedPlaceholder = true; }
-  }
   for (const k of OPTIONAL) {
     const v = process.env[k];
     if (v) env[k] = v;
   }
-  return env;
+  return Object.keys(env).length > 0 ? env : undefined;
 }
 
 // Lê/mescla/grava JSON preservando o resto do arquivo. mutate recebe o objeto raiz.
@@ -112,14 +105,7 @@ export function installMcp(argv: string[]): void {
     process.exit(1);
   }
   for (const t of targets) AGENTS[t](isGlobal);
-  if (usedPlaceholder) {
-    console.log(
-      `\n⚠️  Credenciais não estavam no ambiente — gravei placeholders <DB_USER>/<DB_PASSWORD>/<DB_CONNECT_STRING>.`,
-    );
-    console.log(
-      `   Edite os configs, ou reinstale com as vars setadas:\n   DB_USER=... DB_PASSWORD=... DB_CONNECT_STRING=host:1521/service npx -y dba-master@latest install`,
-    );
-  }
+
   console.log(`\nServer MCP 'dba-master' registrado (${isGlobal ? "global" : "project scoped"}). Reinicie o agente para carregar.`);
 }
 
