@@ -18,7 +18,7 @@ export async function runGenerate(args: string[]): Promise<void> {
   const force = args.includes("--force");
 
   console.clear();
-  cfonts.say("DBA-MASTER · TYPES", {
+  cfonts.say("DBA-MASTER", {
     font: "block",
     align: "left",
     colors: ["#f80", "#f40"],

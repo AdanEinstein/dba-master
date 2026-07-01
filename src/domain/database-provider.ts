@@ -31,6 +31,8 @@ export interface DatabaseProvider {
 
   listTables(schema?: string): Promise<TableRef[]>;
   searchTables(pattern: string, schema?: string): Promise<TableRef[]>;
+  /** last_ddl_time de todas as tabelas/views do schema, em UMA query (fast-path do cache incremental). */
+  listDdlTimes(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]>;
   /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */
   describeTable(table: string, schema?: string): Promise<TableSchema>;
   getRelationships(table: string, schema?: string): Promise<Relationships>;

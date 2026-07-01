@@ -28,6 +28,10 @@ async function mapPool<T>(items: T[], limit: number, fn: (t: T) => Promise<void>
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
+// ponytail: reusa describeTable/describeView (traz PK/FK/índices/text que a interface não usa) —
+// simples e o cache incremental pula reescrita de arquivos inalterados. Se compilar schema
+// gigante ficar lento, adicionar um método column-only no provider.
+
 export async function generateInterfaces(
   db: DatabaseProvider,
   cacheDir: string,
