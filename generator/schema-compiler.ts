@@ -1,5 +1,7 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { DatabaseProvider } from "../src/domain/database-provider.js";
-import { writeTableCache } from "../src/infrastructure/schema-cache.js";
+import { writeTableCache, readCachedDdlTime } from "../src/infrastructure/schema-cache.js";
 import { DEFAULT_POOL_MAX } from "../src/config.js";
 
 // Compila em lote: varre tabelas (e views) do schema e gera/atualiza as interfaces .ts.
@@ -52,9 +54,38 @@ export async function generateInterfaces(
   const typeToTs = db.typeToTs.bind(db);
   const poolMax = opts.poolMax ?? DEFAULT_POOL_MAX; // Limite de concorrência
 
+  const ddlCache = new Map<string, string>();
+  if (!opts.force && db.listDdlTimes) {
+    try {
+      const times = await db.listDdlTimes(opts.schema);
+      for (const t of times) {
+        if (t.lastDdlTime) ddlCache.set(`${t.owner}.${t.name}`, t.lastDdlTime);
+      }
+    } catch {
+      // Ignora, caso listDdlTimes falhe (ou provedor lance erro de não implementado).
+    }
+  }
+
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {
     const name = `${t.owner}.${t.tableName}`;
+
+    if (!opts.force && ddlCache.has(name)) {
+      const targetDdl = ddlCache.get(name);
+      const file = join(cacheDir, t.owner, `${t.tableName}.ts`);
+      try {
+        const existing = await readFile(file, "utf8");
+        if (readCachedDdlTime(existing) === targetDdl) {
+          tables++; // Considera processado (cache hit)
+          files.push(file);
+          opts.onProgress?.(++done, total, name);
+          return;
+        }
+      } catch {
+        // arquivo não existe ou erro ao ler, prossegue para o describe
+      }
+    }
+
     try {
       const s = await db.describeTable(t.tableName, t.owner);
       // FKs de entrada não vêm do describeTable — buscadas à parte (usamos só .incoming).
@@ -81,6 +112,23 @@ export async function generateInterfaces(
   let views = 0;
   await mapPool(viewRefs, poolMax, async (v) => {
     const name = `${v.owner}.${v.viewName}`;
+
+    if (!opts.force && ddlCache.has(name)) {
+      const targetDdl = ddlCache.get(name);
+      const file = join(cacheDir, v.owner, `${v.viewName}.ts`);
+      try {
+        const existing = await readFile(file, "utf8");
+        if (readCachedDdlTime(existing) === targetDdl) {
+          views++;
+          files.push(file);
+          opts.onProgress?.(++done, total, name);
+          return;
+        }
+      } catch {
+        // arquivo não existe ou erro ao ler, prossegue para o describe
+      }
+    }
+
     try {
       const s = await db.describeView(v.viewName, v.owner);
       const meta = { kind: "view" as const, lastDdlTime: s.lastDdlTime, comment: s.comment };

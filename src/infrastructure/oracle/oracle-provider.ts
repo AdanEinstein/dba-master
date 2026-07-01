@@ -33,6 +33,11 @@ export class OracleProvider implements DatabaseProvider {
     return "unknown";
   }
 
+  async listDdlTimes(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]> {
+    const rows = await this.q.findDdlTimes(schema);
+    return rows.map((r) => ({ owner: r.OWNER, name: r.OBJECT_NAME, lastDdlTime: r.LAST_DDL_TIME?.toISOString() ?? "" }));
+  }
+
   async listTables(schema?: string): Promise<TableRef[]> {
     const rows = await this.q.findTables(schema);
     return rows.map((r) => ({ owner: r.OWNER, tableName: r.TABLE_NAME, numRows: r.NUM_ROWS }));

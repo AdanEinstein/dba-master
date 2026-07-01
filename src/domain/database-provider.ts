@@ -29,6 +29,9 @@ export interface DatabaseProvider {
   /** Mapeia um tipo nativo do banco para o tipo TypeScript equivalente. */
   typeToTs(dataType: string): string;
 
+  /** last_ddl_time de todas as tabelas/views do schema, em UMA query (fast-path do cache). */
+  listDdlTimes(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]>;
+
   listTables(schema?: string): Promise<TableRef[]>;
   searchTables(pattern: string, schema?: string): Promise<TableRef[]>;
   /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */
