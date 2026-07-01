@@ -7,18 +7,22 @@ Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só 
 
 ## Instalação e Configuração
 
-Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx` (as credenciais vão no bloco `env` do cliente MCP, pois o pacote npx não tem `.env` ao lado).
+Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx`.
 
 **1. Iniciar o instalador unificado**
 
 ```bash
-DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install
+npx -y dba-master install
 ```
 
-O comando abrirá uma interface iterativa onde você poderá selecionar quais agentes deseja configurar (Claude, Copilot, Opencode, Antigravity). As credenciais vêm do ambiente e são gravadas no bloco `env` do cliente MCP. Se ausentes, gravam placeholders `<DB_USER>` etc. para editar depois.
+O comando abrirá uma interface interativa onde você poderá:
+- Configurar uma ou mais conexões com bancos de dados.
+- Selecionar se deseja instalação com **escopo de projeto** (na pasta atual) ou **global** (na home).
+- Selecionar quais agentes de IA deseja configurar (Claude, Copilot, Opencode, Antigravity).
 
-No Claude Code, alternativamente via CLI (apenas MCP):
+As credenciais e conexões configuradas serão salvas no arquivo `connections.json` (dentro da pasta `.dba-master` do seu projeto ou globalmente em `~/.dba-master/`).
+
+No Claude Code, alternativamente via CLI (apenas configuração do server MCP, exigirá variáveis de ambiente de fallback):
 
 ```bash
 claude mcp add dba-master -s user \
@@ -51,7 +55,22 @@ cp .env.example .env   # edite com suas credenciais
 npm run build          # compila para dist/
 ```
 
-### Variáveis de ambiente
+### Configuração Manual
+
+O `dba-master` trabalha nativamente lendo as conexões a partir de um arquivo `connections.json` localizado na pasta `.dba-master` (global ou no projeto atual). Exemplo:
+
+```json
+{
+  "prod": {
+    "engine": "oracle",
+    "user": "system",
+    "password": "syspassword",
+    "connectString": "localhost:1521/ORCL"
+  }
+}
+```
+
+Caso o arquivo não seja encontrado, o sistema possui um fallback para ler a conexão "default" a partir das **Variáveis de ambiente**:
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
@@ -62,7 +81,7 @@ npm run build          # compila para dist/
 | `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
 | `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
 | `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `./.cache`) |
+| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/.cache`) |
 
 ### Verificação
 
@@ -80,9 +99,12 @@ demanda (ex.: "otimize esta query", "modele X") e o agente investiga o schema.
 
 Todas as tools retornam **JSON estruturado** (em `content[].text`), pensado para consumo por outro agente de IA — não para leitura humana direta.
 
+O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connections` para descobrir os bancos mapeados.
+
 | Tool | O que faz | Parâmetros |
 |---|---|---|
-| `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
+| `list_connections` | Lista as conexões mapeadas configuradas no dba-master | - |
+| `list_tables` | Lista tabelas (owner, nome, num_rows) | `connectionName`, `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
 | `describe_table` | Colunas (tipo, nullable, default), PK, FKs de saída, índices; gera interface `.ts` | `table`, `schema?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
@@ -93,6 +115,7 @@ Todas as tools retornam **JSON estruturado** (em `content[].text`), pensado para
 | `run_sql` | Executa SQL (sujeito ao `READ_ONLY`) | `sql`, `maxRows?` |
 
 **Parâmetros comuns:**
+- **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
 - **`schema`** (opcional): escopa a um owner específico. Omitido = todos os schemas acessíveis (exclui os mantidos pela Oracle).
 - **`pattern`** (opcional nas listagens): substring do nome, case-insensitive.
 
