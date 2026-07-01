@@ -4,9 +4,9 @@
   "description": "MCP server para introspecção profunda de bancos Oracle, voltado a consumo por agentes de IA",
   "type": "module",
   "bin": {
-    "dba-master": "dist/index.js"
+    "dba-master": "dist/src/index.js"
   },
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "files": [
     "dist",
     "agents/commands"
@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx src/domain/types.test.ts",

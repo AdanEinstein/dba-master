@@ -2,7 +2,7 @@
 // Porta em Node do agents/install.sh, para funcionar quando o pacote é consumido via npx
 // (sem o repo). Lê o corpo do .md empacotado em agents/commands/ (ver "files" no package.json).
 // ponytail: fs cru + frontmatter por agente; sem engine de template. Fonte única do corpo.
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +12,12 @@ const DESC =
   "Investiga o schema de um banco via tools MCP do dba-master e propõe soluções (queries, modelagem, diagnóstico)";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// dist/install-agents.js → <pkgroot>/agents/commands/... (npm); src via tsx → <repo>/agents/commands/...
-const body = () => readFileSync(resolve(HERE, "..", "agents", "commands", `${CMD}.md`), "utf8");
+
+const agentPathDev = resolve(HERE, "..", "agents", "commands", `${CMD}.md`);
+const agentPathProd = resolve(HERE, "..", "..", "agents", "commands", `${CMD}.md`);
+const bodyPath = existsSync(agentPathDev) ? agentPathDev : agentPathProd;
+
+const body = () => readFileSync(bodyPath, "utf8");
 
 function write(dest: string, content: string): void {
   mkdirSync(dirname(dest), { recursive: true });

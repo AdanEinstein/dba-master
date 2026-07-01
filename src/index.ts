@@ -16,7 +16,7 @@ import { registerTools } from "./mcp/register.js";
 // Subcomandos de instalação nos agentes (uso via npx, sem repo). Import dinâmico:
 // não carrega fs/instalador no caminho do server MCP.
 if (process.argv[2] === "install") {
-  const { runInstaller } = await import("./install.js");
+  const { runInstaller } = await import("../installer/index.js");
   await runInstaller();
   process.exit(0);
 }
