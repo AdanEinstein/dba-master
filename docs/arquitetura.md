@@ -11,7 +11,7 @@ mcp/tools  →  domain/database-provider (PORT)  ←  infrastructure/oracle (ADA
 
 ```
 src/
-  config.ts                         # configuração (.env) + DB_ENGINE
+  config.ts                         # carrega o connections.json (mapa de conexões + engine)
   domain/
     types.ts                        # DTOs + lógica pura (isWriteStatement, generateInterface)
     database-provider.ts            # PORT: interface DatabaseProvider + Capabilities
@@ -43,14 +43,14 @@ tudo isso está isolado em `infrastructure/oracle/`.
    `implements DatabaseProvider`. Recursos que o banco não tem (ex.: packages no Postgres)
    → declarar `capabilities.packages = false`; a tool responde `{ supported: false }` sem erro.
 2. Adicionar um `case "<engine>"` em `src/infrastructure/provider-factory.ts`.
-3. Selecionar via `DB_ENGINE=<engine>` no `.env`.
+3. Selecionar via `"engine": "<engine>"` na conexão do `connections.json`.
 
 Nada muda em `domain/`, `mcp/tools/*` nem `index.ts`.
 
 ## Cache incremental de tipos
 
-`describe_table`/`describe_view` geram `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface`
-(default de `CACHE_DIR`: `.dba-master/types`, ao lado do `connections.json`). O mapeamento de
+`describe_table`/`describe_view` geram `<cache>/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface`
+(o cache é sempre `.dba-master/types`, ao lado do `connections.json`). O mapeamento de
 tipos vem do provider (`typeToTs` — específico do banco), então o cache é DB-agnóstico.
 
 O header do arquivo grava o `hash` criptográfico (SHA-256) do conteúdo; na próxima chamada, o hash do novo conteúdo gerado é comparado e se bater, a reescrita no sistema de arquivos é pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis em código.
@@ -61,9 +61,10 @@ ambos incrementais: a tool MCP `generate_interfaces` e o subcomando CLI `npx -y 
 (pasta `generator/`, com UI animada @clack/cfonts; standalone: `loadConfig` → `ProviderManager`
 → `generateInterfaces`, que emite progresso via `onProgress` para o spinner).
 
-## Semântica do `READ_ONLY`
+## Semântica do `readOnly`
 
-Bloqueia **apenas** escrita (INSERT/UPDATE/DELETE/MERGE/DDL) no `run_sql`. Toda leitura —
+Configurado por conexão no `connections.json` (default `true`), bloqueia **apenas** escrita
+(INSERT/UPDATE/DELETE/MERGE/DDL) no `run_sql`. Toda leitura —
 SELECT, extração de DDL, leitura de procedures/packages/schedulers/metadados — é sempre
 permitida, por ser introspecção, não mutação. A guarda (`isWriteStatement`, em `domain/`) é
 DB-agnóstica e composta na tool `run_sql`, fora do adapter.

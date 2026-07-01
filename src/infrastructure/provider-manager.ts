@@ -6,7 +6,7 @@ import { OracleProvider } from "./oracle/oracle-provider.js";
 export class ProviderManager {
   private providers = new Map<string, DatabaseProvider>();
 
-  constructor(private readonly cfg: Config) {
+  constructor(cfg: Config) {
     for (const [name, connCfg] of Object.entries(cfg.connections)) {
       this.providers.set(name, this.createProvider(connCfg, cfg));
     }
@@ -26,6 +26,9 @@ export class ProviderManager {
   }
 
   public resolveConnectionName(name?: string): string {
+    if (this.providers.size === 0) {
+      throw new Error("Nenhuma conexão configurada. Rode `npx -y dba-master configure` para criar o connections.json.");
+    }
     if (!name) {
       if (this.providers.size === 1) {
         return Array.from(this.providers.keys())[0];

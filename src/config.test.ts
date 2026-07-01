@@ -1,45 +1,57 @@
-import { test, describe, beforeEach, afterEach, mock } from "node:test";
+import { test, describe, afterEach } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { loadConfig, DEFAULT_POOL_MAX } from "./config.js";
 
-describe("Config DB_POOL_MAX parsing", () => {
-  const originalEnv = process.env;
+// loadConfig lê ./.dba-master/connections.json (cwd) ou ~/.dba-master/connections.json.
+// Isolamos ambos via cwd temporário + HOME temporário (os.homedir() usa $HOME no POSIX),
+// exercitando o fs real em vez de mockar imports nomeados de node:fs (que não interceptam).
+function sandbox(connections?: unknown): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dba-cfg-"));
+  process.chdir(dir);
+  process.env.HOME = dir;
+  if (connections !== undefined) {
+    fs.mkdirSync(path.join(dir, ".dba-master"));
+    fs.writeFileSync(path.join(dir, ".dba-master", "connections.json"), JSON.stringify(connections));
+  }
+}
 
-  beforeEach(() => {
-    process.env = { ...originalEnv };
-    mock.method(fs, 'existsSync', () => false);
-  });
+describe("loadConfig — connections.json como fonte única", () => {
+  const origCwd = process.cwd();
+  const origHome = process.env.HOME;
 
   afterEach(() => {
-    process.env = originalEnv;
-    mock.restoreAll();
+    process.chdir(origCwd);
+    process.env.HOME = origHome;
   });
 
-  test("uses default value when DB_POOL_MAX is absent", () => {
-    delete process.env.DB_POOL_MAX;
-    process.env.DB_USER = "test"; // To ensure fallback config is created
-    
+  test("sem connections.json não lança e retorna zero conexões (evita -32000 no boot)", () => {
+    sandbox();
     const config = loadConfig();
-    const firstKey = Object.keys(config.connections)[0];
-    assert.strictEqual(config.connections[firstKey].poolMax, DEFAULT_POOL_MAX);
+    assert.deepStrictEqual(config.connections, {});
+    assert.strictEqual(typeof config.cacheDir, "string");
   });
 
-  test("parses valid numeric DB_POOL_MAX", () => {
-    process.env.DB_POOL_MAX = "12";
-    process.env.DB_USER = "test";
-    
-    const config = loadConfig();
-    const firstKey = Object.keys(config.connections)[0];
-    assert.strictEqual(config.connections[firstKey].poolMax, 12);
+  test("aplica defaults por conexão (poolMax, readOnly, schemaFilter)", () => {
+    sandbox({ dev: { engine: "oracle", user: "u", connectString: "host/svc" } });
+    const { connections } = loadConfig();
+    assert.strictEqual(connections.dev.poolMax, DEFAULT_POOL_MAX);
+    assert.strictEqual(connections.dev.readOnly, true);
+    assert.deepStrictEqual(connections.dev.schemaFilter, []);
   });
 
-  test("falls back to default when DB_POOL_MAX is invalid string", () => {
-    process.env.DB_POOL_MAX = "invalid";
-    process.env.DB_USER = "test";
-    
-    const config = loadConfig();
-    const firstKey = Object.keys(config.connections)[0];
-    assert.strictEqual(config.connections[firstKey].poolMax, DEFAULT_POOL_MAX);
+  test("preserva settings explícitos do connections.json", () => {
+    sandbox({
+      prod: {
+        engine: "oracle", user: "u", connectString: "host/svc",
+        poolMax: 20, readOnly: false, schemaFilter: ["APP"],
+      },
+    });
+    const { connections } = loadConfig();
+    assert.strictEqual(connections.prod.poolMax, 20);
+    assert.strictEqual(connections.prod.readOnly, false);
+    assert.deepStrictEqual(connections.prod.schemaFilter, ["APP"]);
   });
 });

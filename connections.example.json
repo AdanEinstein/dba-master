@@ -1,0 +1,12 @@
+{
+  "my_conn": {
+    "engine": "oracle",
+    "user": "meu_usuario",
+    "password": "minha_senha",
+    "connectString": "host:1521/service_name",
+    "thick": false,
+    "poolMax": 8,
+    "readOnly": true,
+    "schemaFilter": ["APP"]
+  }
+}

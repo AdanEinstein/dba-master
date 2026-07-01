@@ -35,12 +35,9 @@ Dependendo do escopo escolhido, os arquivos de configuração (ex: `mcpServers`)
 | Opencode        | `~/.config/opencode/opencode.json` / `./.opencode/opencode.json` | `~/.config/opencode/command/...` / `./.opencode/command/...` |
 | Antigravity     | `~/.gemini/config/mcp_config.json` / `./.agents/mcp_config.json` | `~/.gemini/skills/dba-investigate/SKILL.md` / `./.agents/skills/dba-investigate/SKILL.md` |
 
-**Claude Code** — alternativa via CLI:
+**Claude Code** — alternativa via CLI (credenciais no `connections.json`, via `npx -y dba-master configure`):
 ```bash
-claude mcp add dba-master -s user \
-  -e DB_USER=usuario -e DB_PASSWORD=senha \
-  -e DB_CONNECT_STRING=host:1521/service_name \
-  -- npx -y dba-master
+claude mcp add dba-master -s user -- npx -y dba-master
 ```
 
 ### Qualquer outro cliente MCP (manual)

@@ -1,46 +1,66 @@
 # Instalação e configuração
 
-Duas formas: **via npm** (sem clonar, credenciais no ambiente) ou **a partir do repo** (dev).
+Duas formas: **via npm** (sem clonar) ou **a partir do repo** (dev). Em ambos os casos a
+configuração vem **exclusivamente** do `connections.json` — não há leitura de `.env` nem de
+variáveis de ambiente.
 
 ## Via npm (`npx`)
 
-Não precisa clonar nem buildar. As credenciais vão no bloco `env` do cliente MCP — o pacote
-instalado via `npx` **não tem `.env` ao lado**, então a config vem das variáveis de ambiente.
-Ver [release.md](release.md) para o snippet completo.
+Não precisa clonar nem buildar. As credenciais ficam no `connections.json`, gravado pelos
+prompts interativos de `configure` (ou `install`). O registro do server MCP no cliente não
+tem bloco `env`:
 
 ```bash
-claude mcp add dba-master \
-  -e DB_USER=usuario -e DB_PASSWORD=senha \
-  -e DB_CONNECT_STRING=host:1521/service_name \
-  -- npx -y dba-master
+npx -y dba-master configure          # cria/edita o connections.json (prompts interativos)
+claude mcp add dba-master -- npx -y dba-master
 ```
 
 ## Setup a partir do repo (dev)
 
 ```bash
 npm install
-cp .env.example .env   # edite com suas credenciais
-npm run build          # compila para dist/
+cp connections.example.json ./.dba-master/connections.json   # edite com suas credenciais
+npm run build                                                 # compila para dist/
 ```
 
-Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só use
-`DB_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
+Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina
+`"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
-## Variáveis de ambiente
+## Campos do `connections.json`
 
-| Variável | Obrigatória | Descrição |
+O arquivo fica em `./.dba-master/connections.json` (projeto, tem precedência) ou
+`~/.dba-master/connections.json` (global). É um mapa plano `nomeDaConexao → objeto de
+conexão` (ver `connections.example.json` na raiz):
+
+```json
+{
+  "my_conn": {
+    "engine": "oracle",
+    "user": "meu_usuario",
+    "password": "minha_senha",
+    "connectString": "host:1521/service_name",
+    "thick": false,
+    "poolMax": 8,
+    "readOnly": true,
+    "schemaFilter": ["APP"]
+  }
+}
+```
+
+| Campo | Obrigatório | Descrição |
 |---|---|---|
-| `DB_USER` / `DB_PASSWORD` | sim | Credenciais |
-| `DB_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
-| `DB_ENGINE` | não | Engine de banco (default `oracle`) |
-| `DB_CLIENT_MODE` | não | `thin` (default) ou `thick` |
-| `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
-| `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
-| `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/types`) |
+| `user` / `password` | sim | Credenciais |
+| `connectString` | sim | Ex.: `host:1521/service_name` |
+| `engine` | não | Engine de banco (default `oracle`) |
+| `thick` | não | `false` (default) usa modo thin; `true` exige Instant Client |
+| `clientLibDir` | não | Libs do client (só thick, caminho não-padrão) |
+| `poolMax` | não | Tamanho máximo do pool (default `8`) |
+| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
+| `schemaFilter` | não | Array de schemas em MAIÚSCULO; `[]` (default) = todos os schemas de usuário |
 
-O `.env` é lido da **raiz do projeto** (relativo ao módulo), então o server acha as
-credenciais mesmo quando iniciado por um agente a partir de outro diretório.
+O cache das interfaces `.ts` não é configurável: é sempre `<pasta do connections.json>/types`
+(ex.: `.dba-master/types`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON
+manualmente.
 
 ## Registrar num cliente MCP
 
@@ -69,8 +89,8 @@ Claude Desktop, em `claude_desktop_config.json`:
 
 ## Gerar interfaces do schema
 
-Compila em lote as `interface` TypeScript de todas as tabelas (e views) para `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>`
-(default `.dba-master/types`). Mesmo estilo do `install` — roda via `npx`, sem clonar:
+Compila em lote as `interface` TypeScript de todas as tabelas (e views) para
+`.dba-master/types/<NOME_DA_CONEXAO>/<OWNER>`. Mesmo estilo do `install` — roda via `npx`, sem clonar:
 
 ```bash
 npx -y dba-master@latest generate                 # todas as tabelas + views dos schemas acessíveis
@@ -79,7 +99,7 @@ npx -y dba-master@latest generate --no-views      # pula views
 npx -y dba-master@latest generate --connection prod   # escolhe a conexão nomeada
 ```
 
-Usa as credenciais do `connections.json` (gravado pelo `install`) ou do `.env`. É
+Usa as credenciais do `connections.json` (gravado pelo `install`/`configure`). É
 **incremental**: objetos em que o hash do conteúdo gerado for inalterado não são reescritos no sistema de arquivos. Também disponível
 via tool MCP `generate_interfaces` para o agente chamar sob demanda.
 

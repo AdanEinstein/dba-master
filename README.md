@@ -42,7 +42,7 @@ para investigar o schema e propor soluções (queries, modelagem, diagnósticos)
 ◆  Conexão salva em /home/.../dba-master/.dba-master/connections.json
 ```
 
-Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só use `DB_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
+Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
 ## Instalação e Configuração
 
@@ -73,26 +73,18 @@ Para gerenciar as conexões existentes de forma isolada (criar, editar ou exclui
 npx -y dba-master@latest configure
 ```
 
-No Claude Code, alternativamente via CLI (apenas configuração do server MCP, exigirá variáveis de ambiente de fallback):
+No Claude Code, alternativamente via CLI (apenas registro do server MCP — as credenciais vêm do `connections.json`, criado com `npx -y dba-master configure`):
 
 ```bash
-claude mcp add dba-master -s user \
-  -e DB_USER=usuario -e DB_PASSWORD=senha \
-  -e DB_CONNECT_STRING=host:1521/service_name \
-  -- npx -y dba-master
+claude mcp add dba-master -s user -- npx -y dba-master
 ```
 
-Outros clientes MCP (manual, via stdio):
+Outros clientes MCP (manual, via stdio) — sem bloco `env`, pois as credenciais vivem no `connections.json`:
 
 ```jsonc
 {
   "command": "npx",
-  "args": ["-y", "dba-master"],
-  "env": {
-    "DB_USER": "usuario",
-    "DB_PASSWORD": "senha",
-    "DB_CONNECT_STRING": "host:1521/service_name"
-  }
+  "args": ["-y", "dba-master"]
 }
 ```
 
@@ -104,20 +96,20 @@ Reabra/recarregue o agente após instalar. O agente vai ganhar as ferramentas MC
 npx -y dba-master@latest generate            # compila todas as tabelas + views em .ts
 ```
 
-Popula o `CACHE_DIR` de uma vez com as interfaces TypeScript de todo o schema — ver
+Popula o cache (`.dba-master/types`) de uma vez com as interfaces TypeScript de todo o schema — ver
 [Gerar interfaces do schema](#gerar-interfaces-do-schema) para flags e detalhes.
 
 ### Setup a partir do repositório (dev)
 
 ```bash
 npm install
-cp .env.example .env   # edite com suas credenciais
-npm run build          # compila para dist/
+cp connections.example.json ./.dba-master/connections.json   # edite com suas credenciais
+npm run build                                                 # compila para dist/
 ```
 
 ### Configuração Manual
 
-O `dba-master` trabalha nativamente lendo as conexões a partir de um arquivo `connections.json` localizado na pasta `.dba-master` (global ou no projeto atual). Exemplo:
+O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.json` localizado na pasta `.dba-master` (`./.dba-master/connections.json` no projeto — que tem precedência — ou `~/.dba-master/connections.json` global). Não há mais leitura de `.env` nem de variáveis de ambiente. O arquivo é um mapa plano `nomeDaConexao → objeto de conexão` (ver `connections.example.json`). Exemplo:
 
 ```json
 {
@@ -125,29 +117,35 @@ O `dba-master` trabalha nativamente lendo as conexões a partir de um arquivo `c
     "engine": "oracle",
     "user": "system",
     "password": "syspassword",
-    "connectString": "localhost:1521/ORCL"
+    "connectString": "localhost:1521/ORCL",
+    "thick": false,
+    "poolMax": 8,
+    "readOnly": true,
+    "schemaFilter": ["APP"]
   }
 }
 ```
 
-Caso o arquivo não seja encontrado, o sistema possui um fallback para ler a conexão "default" a partir das **Variáveis de ambiente**:
+Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
 
-| Variável | Obrigatória | Descrição |
+| Campo | Obrigatório | Descrição |
 |---|---|---|
-| `DB_USER` / `DB_PASSWORD` | sim | Credenciais |
-| `DB_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
-| `DB_ENGINE` | não | Engine de banco (default `oracle`) |
-| `DB_CLIENT_MODE` | não | `thin` (default) ou `thick` |
-| `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
-| `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
-| `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/types`) |
+| `user` / `password` | sim | Credenciais |
+| `connectString` | sim | Ex.: `host:1521/service_name` |
+| `engine` | não | Engine de banco (default `oracle`) |
+| `thick` | não | `false` (default) usa modo thin; `true` exige Instant Client |
+| `clientLibDir` | não | Libs do client (só thick, caminho não-padrão) |
+| `poolMax` | não | Tamanho máximo do pool (default `8`) |
+| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
+| `schemaFilter` | não | Array de schemas em MAIÚSCULO; vazio (`[]`, default) = todos os schemas de usuário (exclui os mantidos pela Oracle) |
+
+O `cacheDir` não é configurável: é sempre `<pasta do connections.json>/types` (ex.: `.dba-master/types`).
 
 ### Gerar interfaces do schema
 
 Além da geração sob demanda no `describe_table`/`describe_view`, dá para **compilar tudo de
-uma vez** — todas as tabelas (e views) viram `interface` `.ts` em `CACHE_DIR` (default
-`.dba-master/types`). Mesmo estilo do `install`, roda via `npx`:
+uma vez** — todas as tabelas (e views) viram `interface` `.ts` no cache (`.dba-master/types`).
+Mesmo estilo do `install`, roda via `npx`:
 
 ```bash
 npx -y dba-master@latest generate                 # todas as tabelas + views
@@ -198,7 +196,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_procedures` | Procedures/functions com assinatura de parâmetros | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas com assinaturas | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
-| `run_sql` | Executa SQL (sujeito ao `READ_ONLY`) | `sql`, `maxRows?` |
+| `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
 
 **Parâmetros comuns:**
 - **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
@@ -211,10 +209,10 @@ Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem u
 
 ### `run_sql` e o modo read-only
 
-Com `READ_ONLY=true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
+Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ### Cache de tipos
 
-Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O arquivo marca `// kind: table`/`// kind: view` e, em bloco JSDoc, traz comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e comentário de cada coluna. A regeneração é **incremental**: o builder valida o hash (SHA-256) do conteúdo gerado contra o header do arquivo e só o reescreve se o hash mudar (o que soluciona corretamente o problema de invalidação para alterações nas dependências da tabela). A resposta inclui `cacheFile` com o caminho gerado. Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou `npx -y dba-master@latest generate` (CLI).
+Em cada `describe_table`/`describe_view`, o objeto vira `<cache>/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface` TypeScript (o cache é sempre `.dba-master/types`, ao lado do `connections.json`). O arquivo marca `// kind: table`/`// kind: view` e, em bloco JSDoc, traz comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e comentário de cada coluna. A regeneração é **incremental**: o builder valida o hash (SHA-256) do conteúdo gerado contra o header do arquivo e só o reescreve se o hash mudar (o que soluciona corretamente o problema de invalidação para alterações nas dependências da tabela). A resposta inclui `cacheFile` com o caminho gerado. Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou `npx -y dba-master@latest generate` (CLI).
 
-**Otimização para LSP:** Um `tsconfig.json` também é gerado automaticamente na raiz da conexão (`CACHE_DIR/<NOME_DA_CONEXAO>/tsconfig.json`). Isso agrupa os arquivos exportados em um projeto único, ativando suporte avançado de autocomplete, Go-to-Definition e resolução de módulos nativamente por editores baseados em LSP (`tsserver`) e agentes de IA integrados.
+**Otimização para LSP:** Um `tsconfig.json` também é gerado automaticamente na raiz da conexão (`.dba-master/types/<NOME_DA_CONEXAO>/tsconfig.json`). Isso agrupa os arquivos exportados em um projeto único, ativando suporte avançado de autocomplete, Go-to-Definition e resolução de módulos nativamente por editores baseados em LSP (`tsserver`) e agentes de IA integrados.

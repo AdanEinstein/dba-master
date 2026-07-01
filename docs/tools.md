@@ -16,7 +16,7 @@ por outro agente de IA — não para leitura humana direta.
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
-| `run_sql` | Executa SQL; com `READ_ONLY` só permite `SELECT`/`WITH`, limita linhas | `sql`, `maxRows?` |
+| `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`, limita linhas | `sql`, `maxRows?` |
 
 ## Parâmetros comuns
 
@@ -32,15 +32,15 @@ com lista vazia — sem erro. No Oracle, ambos são `true`.
 
 ## `run_sql` e o modo read-only
 
-Com `READ_ONLY=true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita
+Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita
 (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro
 token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário
 Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ## Cache de tipos
 
-Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma
-`interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O header marca
+Em cada `describe_table`/`describe_view`, o objeto vira `<cache>/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma
+`interface` TypeScript (o cache é sempre `.dba-master/types`, ao lado do `connections.json`). O header marca
 `// kind: table`/`// kind: view` e também guarda um `hash` de integridade. Em bloco JSDoc, ele traz o 
 comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos e o comentário de cada coluna. A regeneração é
 **incremental**: o builder valida o hash criptográfico do conteúdo novo e só reescreve no disco

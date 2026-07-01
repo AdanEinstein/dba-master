@@ -18,9 +18,9 @@ export class OracleProvider implements DatabaseProvider {
   private readonly conn: OracleConnection;
   private readonly q: OracleQueries;
 
-  constructor(connCfg: ConnectionConfig, globalCfg: Config) {
+  constructor(connCfg: ConnectionConfig, _globalCfg: Config) {
     this.conn = new OracleConnection(connCfg);
-    this.q = new OracleQueries(this.conn, globalCfg);
+    this.q = new OracleQueries(this.conn, connCfg.schemaFilter ?? []);
   }
 
   /** Mapeia tipo Oracle → tipo TS que o driver oracledb retorna. */

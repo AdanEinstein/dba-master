@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-import { config as loadEnv } from "dotenv";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-// Carrega o .env da raiz do projeto (relativo ao módulo), não do cwd do agente
-// que sobe o server — assim funciona tanto em dist/ quanto em src/ (tsx).
-// quiet: dotenv v17 imprime um banner no stdout — proibido no stream STDIO do MCP.
-loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env"), quiet: true });
-
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { loadConfig } from "./config.js";

@@ -21,11 +21,13 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     },
     async ({ connectionName, sql, maxRows }) => {
       const db = provider.getProvider(connectionName);
+      const name = provider.resolveConnectionName(connectionName);
 
       try {
         // ponytail: guarda por primeiro token, não parser SQL. Teto conhecido — para
         // bloqueio forte, use um usuário do banco read-only (GRANT SELECT).
-        if (cfg.readOnly && isWriteStatement(sql)) {
+        // readOnly é por conexão (default true).
+        if (cfg.connections[name]?.readOnly !== false && isWriteStatement(sql)) {
           throw new Error(
             "READ_ONLY ativo: apenas SELECT/WITH são permitidos. Defina READ_ONLY=false para habilitar escrita.",
           );

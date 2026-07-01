@@ -5,39 +5,30 @@ sem clonar nem buildar.
 
 ## Usar sem o repositório (usuário final)
 
-O jeito mais simples é o subcomando `install`, que registra o servidor MCP `npx -y dba-master` no config de cada agente e a skill respectiva em uma interface iterativa onde você pode escolher os agentes:
+O jeito mais simples é o subcomando `install`, que coleta as credenciais em prompts interativos (gravando no `connections.json`), registra o servidor MCP `npx -y dba-master` no config de cada agente e instala a skill respectiva:
 
 ```bash
-DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master@latest install
+npx -y dba-master@latest install
 ```
 
-Sem as vars no ambiente, grava placeholders `<DB_USER>` etc. para editar depois.
+Para só gerenciar as conexões (sem reinstalar os agentes), use `npx -y dba-master configure`.
 
-No Claude Code, alternativamente via CLI:
+No Claude Code, alternativamente via CLI (credenciais no `connections.json`):
 
 ```bash
-claude mcp add dba-master \
-  -e DB_USER=usuario -e DB_PASSWORD=senha \
-  -e DB_CONNECT_STRING=host:1521/service_name \
-  -- npx -y dba-master
+claude mcp add dba-master -- npx -y dba-master
 ```
 
-Ou config manual em qualquer cliente MCP:
+Ou config manual em qualquer cliente MCP — sem bloco `env`, pois as credenciais vivem no `connections.json`:
 
 ```jsonc
 {
   "command": "npx",
-  "args": ["-y", "dba-master"],
-  "env": {
-    "DB_USER": "usuario",
-    "DB_PASSWORD": "senha",
-    "DB_CONNECT_STRING": "host:1521/service_name"
-  }
+  "args": ["-y", "dba-master"]
 }
 ```
 
-Modo **thin** (default) não exige Oracle Instant Client. Variáveis completas em
+Modo **thin** (default) não exige Oracle Instant Client. Campos do `connections.json` em
 [instalacao.md](instalacao.md).
 
 

@@ -1,4 +1,3 @@
-import type { Config } from "../../config.js";
 import type { OracleConnection } from "./oracle-connection.js";
 
 // Acesso a dados do Oracle: todo SQL contra as views ALL_* e DBMS_METADATA.
@@ -31,7 +30,7 @@ export interface JobRow {
 export class OracleQueries {
   constructor(
     private readonly conn: OracleConnection,
-    private readonly cfg: Config,
+    private readonly schemaFilter: string[],
   ) {}
 
   /**
@@ -42,7 +41,7 @@ export class OracleQueries {
     if (schema) {
       return { sql: `${alias}.owner = :owner`, binds: { owner: schema.toUpperCase() } };
     }
-    const filter = this.cfg.schemaFilter;
+    const filter = this.schemaFilter;
     if (filter.length) {
       const names = filter.map((_, i) => `:s${i}`).join(", ");
       const binds: Record<string, unknown> = {};
