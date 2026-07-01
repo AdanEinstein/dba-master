@@ -6,7 +6,7 @@ import { ProviderManager } from "../src/infrastructure/provider-manager.js";
 import { generateInterfaces } from "./schema-compiler.js";
 
 // Subcomando `npx dba-master generate`: compila as interfaces .ts do schema, standalone.
-// UI animada no mesmo estilo do installer (cfonts + spinner @clack).
+// UI animada no mesmo estilo do setup (cfonts + spinner @clack).
 export async function runGenerate(args: string[]): Promise<void> {
   const flag = (name: string) => {
     const i = args.indexOf(name);

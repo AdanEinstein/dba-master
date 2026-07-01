@@ -65,7 +65,7 @@ const AGENTS: Record<string, (global: boolean) => void> = {
       });
       console.log(`✓ Claude Code     → ${cli}`);
     } else {
-      const cli = join(process.cwd(), ".claude.json");
+      const cli = join(process.cwd(), ".mcp.json");
       updateJson(cli, (d) => {
         bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
       });
@@ -121,4 +121,66 @@ export function installMcp(argv: string[]): void {
     );
   }
   console.log(`\nServer MCP 'dba-master' registrado (${isGlobal ? "global" : "project scoped"}). Reinicie o agente para carregar.`);
+}
+
+function removeFromJson(file: string, mutate: (data: Record<string, unknown>) => void): void {
+  if (existsSync(file)) {
+    try {
+      const data = JSON.parse(readFileSync(file, "utf8"));
+      mutate(data);
+      writeFileSync(file, JSON.stringify(data, null, 2));
+    } catch {
+      console.log(`Aviso: não consegui processar ${file}.`);
+    }
+  }
+}
+
+const UNINSTALL_AGENTS: Record<string, (global: boolean) => void> = {
+  claude(global) {
+    if (global) {
+      const desktop = join(homedir(), ".claude", "claude_desktop_config.json");
+      removeFromJson(desktop, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+      console.log(`✓ Removido do Claude Desktop  → ${desktop}`);
+      const cli = join(homedir(), ".claude.json");
+      removeFromJson(cli, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+      console.log(`✓ Removido do Claude Code     → ${cli}`);
+    } else {
+      const cli = join(process.cwd(), ".mcp.json");
+      removeFromJson(cli, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+      console.log(`✓ Removido do Claude Code     → ${cli}`);
+    }
+  },
+  copilot(global) {
+    const base = global ? homedir() : process.cwd();
+    const f = join(base, ".copilot", "mcp-config.json");
+    removeFromJson(f, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+    console.log(`✓ Removido do Copilot CLI     → ${f}`);
+  },
+  opencode(global) {
+    const f = global 
+      ? join(homedir(), ".config", "opencode", "opencode.json")
+      : join(process.cwd(), ".opencode", "opencode.json");
+    removeFromJson(f, (d) => { if (d.mcp) delete (d.mcp as any)[KEY]; });
+    console.log(`✓ Removido do Opencode        → ${f}`);
+  },
+  antigravity(global) {
+    const f = global 
+      ? join(homedir(), ".gemini", "config", "mcp_config.json")
+      : join(process.cwd(), ".agents", "mcp_config.json");
+    removeFromJson(f, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+    console.log(`✓ Removido do Antigravity     → ${f}`);
+  },
+};
+
+export function uninstallMcp(argv: string[]): void {
+  const isGlobal = argv.includes("-g");
+  const filtered = argv.filter((a) => a !== "-g");
+  const only = filtered[0] === "--agent" ? filtered[1] : filtered[0];
+  const targets = only ? [only] : Object.keys(UNINSTALL_AGENTS);
+  const unknown = targets.filter((t) => !UNINSTALL_AGENTS[t]);
+  if (unknown.length) {
+    console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(UNINSTALL_AGENTS).join(", ")}.`);
+    process.exit(1);
+  }
+  for (const t of targets) UNINSTALL_AGENTS[t](isGlobal);
 }

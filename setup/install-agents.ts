@@ -2,7 +2,7 @@
 // Porta em Node do agents/install.sh, para funcionar quando o pacote é consumido via npx
 // (sem o repo). Lê o corpo do .md empacotado em agents/commands/ (ver "files" no package.json).
 // ponytail: fs cru + frontmatter por agente; sem engine de template. Fonte única do corpo.
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,4 +79,56 @@ export function installAgents(argv: string[]): void {
   }
   for (const t of targets) AGENTS[t](isGlobal);
   console.log(`Pronto. Reabra/recarregue o agente para ele reindexar o comando (${isGlobal ? "global" : "project scoped"}).`);
+}
+
+function removeFile(file: string) {
+  if (existsSync(file)) {
+    unlinkSync(file);
+    console.log(`✓ Removido comando → ${file}`);
+  }
+}
+
+function removeDir(dir: string) {
+  if (existsSync(dir)) {
+    rmSync(dir, { recursive: true, force: true });
+    console.log(`✓ Removido diretório → ${dir}`);
+  }
+}
+
+const UNINSTALL_AGENTS_SKILL: Record<string, (global: boolean) => void> = {
+  claude(global) {
+    const base = global ? homedir() : process.cwd();
+    removeFile(join(base, ".claude", "commands", `${CMD}.md`));
+  },
+  copilot(global) {
+    const base = global ? homedir() : process.cwd();
+    removeDir(join(base, ".copilot", "skills", CMD));
+  },
+  opencode(global) {
+    const dest = global 
+      ? join(homedir(), ".config", "opencode", "command", `${CMD}.md`)
+      : join(process.cwd(), ".opencode", "command", `${CMD}.md`);
+    removeFile(dest);
+  },
+  antigravity(global) {
+    if (global) {
+      removeDir(join(homedir(), ".gemini", "antigravity-cli", "skills", CMD));
+      removeDir(join(homedir(), ".gemini", "skills", CMD));
+    } else {
+      removeDir(join(process.cwd(), ".agents", "skills", CMD));
+    }
+  },
+};
+
+export function uninstallAgents(argv: string[]): void {
+  const isGlobal = argv.includes("-g");
+  const filtered = argv.filter((a) => a !== "-g");
+  const only = filtered[0] === "--agent" ? filtered[1] : filtered[0];
+  const targets = only ? [only] : Object.keys(UNINSTALL_AGENTS_SKILL);
+  const unknown = targets.filter((t) => !UNINSTALL_AGENTS_SKILL[t]);
+  if (unknown.length) {
+    console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(UNINSTALL_AGENTS_SKILL).join(", ")}.`);
+    process.exit(1);
+  }
+  for (const t of targets) UNINSTALL_AGENTS_SKILL[t](isGlobal);
 }

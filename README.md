@@ -48,7 +48,7 @@ Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só 
 
 Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx`.
 
-**1. Iniciar o instalador unificado**
+**1. Iniciar o setup unificado**
 
 ```bash
 npx -y dba-master@latest install
@@ -60,6 +60,12 @@ O comando abrirá uma interface interativa onde você poderá:
 - Selecionar quais agentes de IA deseja configurar (Claude, Copilot, Opencode, Antigravity).
 
 As credenciais e conexões configuradas serão salvas no arquivo `connections.json` (dentro da pasta `.dba-master` do seu projeto ou globalmente em `~/.dba-master/`).
+
+Para desinstalar e limpar os agentes configurados, basta executar:
+
+```bash
+npx -y dba-master@latest uninstall
+```
 
 No Claude Code, alternativamente via CLI (apenas configuração do server MCP, exigirá variáveis de ambiente de fallback):
 

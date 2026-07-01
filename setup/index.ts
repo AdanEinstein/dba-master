@@ -5,8 +5,8 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
-import { installMcp } from "./install-mcp.js";
-import { installAgents } from "./install-agents.js";
+import { installMcp, uninstallMcp } from "./install-mcp.js";
+import { installAgents, uninstallAgents } from "./install-agents.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -178,4 +178,103 @@ export async function runInstaller() {
     }
   }
   outro("Instalação concluída! Lembre-se de reiniciar seus agentes.");
+}
+
+export async function runUninstaller() {
+  console.clear();
+  
+  cfonts.say("DBA-MASTER", {
+    font: "block",
+    align: "left",
+    colors: ["#f00", "#f40"],
+    background: "transparent",
+    letterSpacing: 1,
+    lineHeight: 1,
+    space: true,
+    maxLength: "0",
+    gradient: ["red", "magenta"],
+    independentGradient: false,
+    transitionGradient: true,
+    env: "node"
+  });
+
+  intro("Desinstalador do DBA-Master");
+
+  const agents = await multiselect({
+    message: "De quais agentes de IA você deseja remover o dba-master?",
+    options: [
+      { value: "claude", label: "Claude Desktop / Claude Code" },
+      { value: "copilot", label: "Copilot CLI" },
+      { value: "opencode", label: "Opencode" },
+      { value: "antigravity", label: "Antigravity" }
+    ],
+    required: true
+  });
+
+  if (isCancel(agents)) {
+    cancel("Desinstalação cancelada.");
+    process.exit(0);
+  }
+
+  const scope = await select({
+    message: "De qual escopo deseja remover as configurações e dados?",
+    options: [
+      { value: "project", label: "Project scoped (na pasta atual)" },
+      { value: "global", label: "Global (no diretório home)" }
+    ]
+  });
+  if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
+
+  const isGlobal = scope === "global";
+
+  const confirmDelete = await confirm({
+    message: `Deseja também apagar o diretório de dados .dba-master (${isGlobal ? "global" : "projeto"})?`,
+    initialValue: true
+  });
+  if (isCancel(confirmDelete)) { cancel("Cancelado"); process.exit(0); }
+
+  const s = spinner();
+  s.start("Removendo configurações dos agentes selecionados...");
+
+  const failedAgents: { agent: string, error: unknown }[] = [];
+
+  for (const agent of (agents as string[])) {
+    try {
+      const args = [`--agent`, agent];
+      if (isGlobal) args.push("-g");
+      uninstallMcp(args);
+      uninstallAgents(args);
+    } catch (e) {
+      failedAgents.push({ agent, error: e });
+    }
+  }
+
+  if (confirmDelete) {
+    const dbaMasterDir = isGlobal
+      ? resolve(homedir(), ".dba-master")
+      : resolve(process.cwd(), ".dba-master");
+    if (fs.existsSync(dbaMasterDir)) {
+      fs.rmSync(dbaMasterDir, { recursive: true, force: true });
+    }
+    
+    // Remover do .gitignore se project scoped
+    if (!isGlobal) {
+      const gitignorePath = resolve(process.cwd(), ".gitignore");
+      if (fs.existsSync(gitignorePath)) {
+        let gitignore = fs.readFileSync(gitignorePath, "utf8");
+        gitignore = gitignore.replace(/\n# DBA-Master\n\.dba-master\n/g, "");
+        fs.writeFileSync(gitignorePath, gitignore);
+      }
+    }
+  }
+
+  if (failedAgents.length === 0) {
+    s.stop("Agentes limpos com sucesso!");
+  } else {
+    s.stop("Desinstalação finalizada, mas houve problemas.");
+    for (const { agent, error } of failedAgents) {
+      log.warn(`Falha ao remover o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  outro("Desinstalação concluída!");
 }

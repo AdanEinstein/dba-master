@@ -27,7 +27,7 @@ src/
     register.ts                     # registra todas as tools, injetando o provider
     tools/*.tool.ts                 # uma tool por arquivo, cada uma register(server, provider)
   index.ts                          # composition root: config → provider → tools
-installer/                          # subcomando `npx dba-master install` (UI @clack + cfonts)
+setup/                              # subcomando `npx dba-master install` e `uninstall` (UI @clack + cfonts)
 generator/                          # subcomando `npx dba-master generate`
   schema-compiler.ts                # generateInterfaces: lote sobre describe* + writeTableCache
   index.ts                          # CLI: UI @clack + cfonts, spinner com progresso
