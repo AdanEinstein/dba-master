@@ -11,6 +11,7 @@ $ARGUMENTS
 As tools retornam **JSON estruturado**. Um banco pode ter milhares de tabelas —
 comece estreito para não afogar o contexto.
 
+0. **Selecione o banco de dados.** Comece rodando a tool `list_connections`. Se houver mais de uma conexão listada, você **DEVE perguntar ao usuário** qual conexão ele deseja investigar. Passe esse nome no argumento `connectionName` para as demais tools.
 1. **Localize as entidades.** Use `search_tables` (padrão do nome) ou, se já souber o
    schema, `list_tables` com o `schema`. Não liste tudo se um `search` resolve.
 2. **Detalhe as tabelas relevantes.** `describe_table` traz colunas (tipo, nullable,

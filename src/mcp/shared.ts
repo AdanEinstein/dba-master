@@ -21,3 +21,8 @@ export const patternArg = z
   .string()
   .optional()
   .describe("Substring do nome a filtrar (case-insensitive). Omitir = todos.");
+
+export const connectionArg = z
+  .string()
+  .optional()
+  .describe("Nome da conexão alvo. Necessário se houver múltiplas conexões configuradas.");

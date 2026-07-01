@@ -4,7 +4,7 @@ import { readCachedDdlTime } from "../infrastructure/schema-cache.js";
 import { OracleProvider } from "../infrastructure/oracle/oracle-provider.js";
 
 // Mapeamento de tipos do adapter Oracle (não instancia conexão — typeToTs é puro)
-const oracle = new OracleProvider({} as never);
+const oracle = new OracleProvider({} as never, {} as never);
 assert.equal(oracle.typeToTs("VARCHAR2"), "string");
 assert.equal(oracle.typeToTs("NUMBER"), "number");
 assert.equal(oracle.typeToTs("DATE"), "Date");

@@ -1,12 +1,12 @@
 import oracledb from "oracledb";
-import type { Config } from "../../config.js";
+import type { ConnectionConfig } from "../../config.js";
 
 // Conexão específica do Oracle: pool node-oracledb e execução de queries cruas.
 
 export class OracleConnection {
   private pool: oracledb.Pool | undefined;
 
-  constructor(private readonly cfg: Config) {}
+  constructor(private readonly cfg: ConnectionConfig) {}
 
   private async getPool(): Promise<oracledb.Pool> {
     if (this.pool) return this.pool;

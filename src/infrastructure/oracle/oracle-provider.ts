@@ -1,4 +1,4 @@
-import type { Config } from "../../config.js";
+import type { Config, ConnectionConfig } from "../../config.js";
 import type { Capabilities, DatabaseProvider } from "../../domain/database-provider.js";
 import type {
   TableRef, TableSchema, Relationships, DdlResult,
@@ -18,9 +18,9 @@ export class OracleProvider implements DatabaseProvider {
   private readonly conn: OracleConnection;
   private readonly q: OracleQueries;
 
-  constructor(cfg: Config) {
-    this.conn = new OracleConnection(cfg);
-    this.q = new OracleQueries(this.conn, cfg);
+  constructor(connCfg: ConnectionConfig, globalCfg: Config) {
+    this.conn = new OracleConnection(connCfg);
+    this.q = new OracleQueries(this.conn, globalCfg);
   }
 
   /** Mapeia tipo Oracle → tipo TS que o driver oracledb retorna. */

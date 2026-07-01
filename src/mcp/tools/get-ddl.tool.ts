@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { DatabaseProvider } from "../../domain/database-provider.js";
-import { jsonResult, errorResult, schemaArg } from "../shared.js";
+import type { ProviderManager } from "../../infrastructure/provider-manager.js";
+import { jsonResult, errorResult, schemaArg , connectionArg } from "../shared.js";
 
-export function register(server: McpServer, provider: DatabaseProvider): void {
+export function register(server: McpServer, provider: ProviderManager): void {
   server.registerTool(
     "get_ddl",
     {
@@ -11,7 +11,8 @@ export function register(server: McpServer, provider: DatabaseProvider): void {
       description:
         "Retorna o DDL de um objeto (tabela, view, procedure, package, trigger, sequence, type).",
       inputSchema: z.object({
-        name: z.string().describe("Nome do objeto."),
+      connectionName: connectionArg,
+      name: z.string().describe("Nome do objeto."),
         schema: schemaArg,
         objectType: z
           .string()
@@ -19,9 +20,11 @@ export function register(server: McpServer, provider: DatabaseProvider): void {
           .describe("Tipo do objeto (TABLE, VIEW, PROCEDURE, PACKAGE, TRIGGER, ...). Autodetecta se omitido."),
       }),
     },
-    async ({ name, schema, objectType }) => {
+    async ({ connectionName, name, schema, objectType }) => {
+      const db = provider.getProvider(connectionName);
+
       try {
-        return jsonResult(await provider.getDdl(name, schema, objectType));
+        return jsonResult(await db.getDdl(name, schema, objectType));
       } catch (e) {
         return errorResult(e);
       }

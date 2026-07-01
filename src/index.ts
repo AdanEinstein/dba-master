@@ -10,7 +10,7 @@ loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env"), 
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { loadConfig } from "./config.js";
-import { createProvider } from "./infrastructure/provider-factory.js";
+import { ProviderManager } from "./infrastructure/provider-manager.js";
 import { registerTools } from "./mcp/register.js";
 
 // Subcomandos de instalação nos agentes (uso via npx, sem repo). Import dinâmico:
@@ -24,20 +24,20 @@ if (process.argv[2] === "install") {
 // Composition root: config → provider (adapter) → tools. Trocar de banco é só o DB_ENGINE.
 
 const cfg = loadConfig();
-const provider = createProvider(cfg);
+const providerManager = new ProviderManager(cfg);
 
 serveStdio(() => {
   const server = new McpServer(
     { name: "dba-master", version: "__VERSION__" },
     { capabilities: { tools: {} } },
   );
-  registerTools(server, provider, cfg);
+  registerTools(server, providerManager, cfg);
   return server;
 });
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, async () => {
-    await provider.close();
+    await providerManager.closeAll();
     process.exit(0);
   });
 }

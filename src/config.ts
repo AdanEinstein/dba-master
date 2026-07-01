@@ -1,51 +1,79 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** Configuração lida do ambiente (.env). Falha cedo se faltar conexão. */
-export interface Config {
-  /** Engine de banco a usar. Default 'oracle'. */
+export interface ConnectionConfig {
   engine: string;
   user: string;
-  password: string;
+  password?: string;
   connectString: string;
-  /** thin (default, JS puro) ou thick (exige Oracle Instant Client). */
-  thick: boolean;
-  /** Diretório das libs do client Oracle quando em modo thick. */
+  thick?: boolean;
   clientLibDir?: string;
-  /** Lista de schemas a introspectar. Vazio = todos os acessíveis não-Oracle. */
+}
+
+export interface Config {
+  connections: Record<string, ConnectionConfig>;
   schemaFilter: string[];
-  /** true = run_sql rejeita escrita (INSERT/UPDATE/DELETE/MERGE/DDL). Leitura sempre liberada. */
   readOnly: boolean;
-  /** Onde as interfaces .ts do cache são gravadas. */
   cacheDir: string;
 }
 
-function req(names: string[]): string {
-  for (const name of names) {
-    const v = process.env[name];
-    if (v) return v;
-  }
-  throw new Error(`Variável de ambiente obrigatória ausente: ${names[0]}`);
-}
-
 export function loadConfig(): Config {
+  let connections: Record<string, ConnectionConfig> = {};
+  
+  const projectJsonPath = resolve(process.cwd(), ".dba-master", "connections.json");
+  const globalJsonPath = resolve(homedir(), ".dba-master", "connections.json");
+  
+  let usedPath = projectJsonPath;
+
+  if (existsSync(projectJsonPath)) {
+    try {
+      const raw = readFileSync(projectJsonPath, "utf8");
+      connections = JSON.parse(raw);
+    } catch (e) {
+      console.warn(`Aviso: falha ao ler ${projectJsonPath}`, e);
+    }
+  } else if (existsSync(globalJsonPath)) {
+    usedPath = globalJsonPath;
+    try {
+      const raw = readFileSync(globalJsonPath, "utf8");
+      connections = JSON.parse(raw);
+    } catch (e) {
+      console.warn(`Aviso: falha ao ler ${globalJsonPath}`, e);
+    }
+  }
+
+  // Fallback para .env se connections.json não existir ou estiver vazio
+  if (Object.keys(connections).length === 0) {
+    const user = process.env.DB_USER;
+    if (user) {
+      connections["default"] = {
+        engine: (process.env.DB_ENGINE || "oracle").toLowerCase(),
+        user,
+        password: process.env.DB_PASSWORD,
+        connectString: process.env.DB_CONNECT_STRING || "",
+        thick: process.env.DB_CLIENT_MODE?.toLowerCase() === "thick",
+        clientLibDir: process.env.DB_CLIENT_LIB_DIR,
+      };
+    }
+  }
+
+  if (Object.keys(connections).length === 0) {
+    throw new Error("Nenhuma conexão configurada. Crie o connections.json ou configure o .env.");
+  }
+
   return {
-    engine: (process.env.DB_ENGINE || "oracle").toLowerCase(),
-    user: req(["DB_USER", "ORACLE_USER"]),
-    password: req(["DB_PASSWORD", "ORACLE_PASSWORD"]),
-    connectString: req(["DB_CONNECT_STRING", "ORACLE_CONNECT_STRING"]),
-    thick: (process.env.DB_CLIENT_MODE || process.env.ORACLE_CLIENT_MODE)?.toLowerCase() === "thick",
-    clientLibDir: process.env.DB_CLIENT_LIB_DIR || process.env.ORACLE_CLIENT_LIB_DIR || undefined,
+    connections,
     schemaFilter: (process.env.SCHEMA_FILTER || "")
       .split(",")
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean),
-    // Default seguro: só liberamos escrita se explicitamente READ_ONLY=false.
     readOnly: process.env.READ_ONLY?.toLowerCase() !== "false",
     cacheDir: process.env.CACHE_DIR
       ? resolve(process.env.CACHE_DIR)
-      : resolve(__dirname, "..", ".cache"),
+      : resolve(dirname(usedPath), ".cache"),
   };
 }

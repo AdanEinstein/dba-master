@@ -20,14 +20,12 @@ let usedPlaceholder = false;
 function envBlock(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const k of REQUIRED) {
-    const fallback = k.replace("DB_", "ORACLE_");
-    const v = process.env[k] || process.env[fallback];
+    const v = process.env[k];
     if (v) env[k] = v;
     else { env[k] = `<${k}>`; usedPlaceholder = true; }
   }
   for (const k of OPTIONAL) {
-    const fallback = k.replace("DB_", "ORACLE_");
-    const v = process.env[k] || process.env[fallback];
+    const v = process.env[k];
     if (v) env[k] = v;
   }
   return env;

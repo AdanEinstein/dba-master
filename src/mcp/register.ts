@@ -1,7 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { DatabaseProvider } from "../domain/database-provider.js";
+import type { ProviderManager } from "../infrastructure/provider-manager.js";
 import type { Config } from "../config.js";
 
+import * as listConnections from "./tools/list-connections.tool.js";
 import * as listTables from "./tools/list-tables.tool.js";
 import * as searchTables from "./tools/search-tables.tool.js";
 import * as describeTable from "./tools/describe-table.tool.js";
@@ -13,7 +14,8 @@ import * as listSchedulersJobs from "./tools/list-schedulers-jobs.tool.js";
 import * as runSql from "./tools/run-sql.tool.js";
 
 /** Registra todas as tools no servidor, injetando o provider (e config onde preciso). */
-export function registerTools(server: McpServer, provider: DatabaseProvider, cfg: Config): void {
+export function registerTools(server: McpServer, provider: ProviderManager, cfg: Config): void {
+  listConnections.register(server, provider);
   listTables.register(server, provider);
   searchTables.register(server, provider);
   describeTable.register(server, provider, cfg);
