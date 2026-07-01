@@ -204,17 +204,6 @@ export class OracleQueries {
     );
   }
 
-  /** last_ddl_time de todas as tabelas/views do schema, numa query só. */
-  findDdlTimes(schema?: string): Promise<{ OWNER: string; OBJECT_NAME: string; LAST_DDL_TIME: Date }[]> {
-    const oc = this.ownerClause("o", schema);
-    return this.conn.query<{ OWNER: string; OBJECT_NAME: string; LAST_DDL_TIME: Date }>(
-      `SELECT o.owner, o.object_name, o.last_ddl_time
-         FROM all_objects o
-        WHERE ${oc.sql} AND o.object_type IN ('TABLE','VIEW')`,
-      oc.binds,
-    );
-  }
-
   async findLastDdlTime(owner: string, name: string, objectType = "TABLE"): Promise<string | undefined> {
     const rows = await this.conn.query<{ LAST_DDL_TIME: Date }>(
       `SELECT last_ddl_time FROM all_objects
