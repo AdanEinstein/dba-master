@@ -10,6 +10,8 @@ export interface ColumnInfo {
   dataPrecision?: number | null;
   dataScale?: number | null;
   dataDefault?: string | null;
+  /** COMMENT ON COLUMN (all_col_comments). */
+  comment?: string | null;
 }
 
 export interface TableRef {
@@ -32,6 +34,11 @@ export interface IndexInfo {
   columns: string[];
 }
 
+export interface CheckConstraint {
+  name: string;
+  condition: string;
+}
+
 // --- Modelos de view ----------------------------------------------------
 
 export interface ViewRef {
@@ -46,6 +53,8 @@ export interface ViewSchema {
   columns: ColumnInfo[];
   /** O SELECT da view (all_views.TEXT). */
   text: string;
+  /** COMMENT ON TABLE/VIEW (all_tab_comments). */
+  comment?: string | null;
   /** Timestamp da última mudança de DDL — usado pelo cache incremental. */
   lastDdlTime?: string;
 }
@@ -58,6 +67,9 @@ export interface TableSchema {
   primaryKey: string[];
   foreignKeys: ForeignKey[];
   indexes: IndexInfo[];
+  checkConstraints: CheckConstraint[];
+  /** COMMENT ON TABLE (all_tab_comments). */
+  comment?: string | null;
   /** Timestamp da última mudança de DDL — usado pelo cache incremental. */
   lastDdlTime?: string;
 }
@@ -135,27 +147,79 @@ export type TypeMapper = (dataType: string) => string;
 
 const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
+/** Metadados que enriquecem a interface gerada (base de conhecimento). */
+export interface InterfaceMeta {
+  kind: "table" | "view";
+  lastDdlTime?: string;
+  comment?: string | null;
+  primaryKey?: string[];
+  foreignKeys?: ForeignKey[]; // saída (esta tabela → outra)
+  incoming?: ForeignKey[]; // entrada (outra tabela → esta)
+  checkConstraints?: CheckConstraint[];
+  indexes?: IndexInfo[];
+}
+
+/** Comentário JSDoc de uma linha, escapando o fechamento de bloco. */
+function safeComment(text: string): string {
+  return text.replace(/\*\//g, "* /").replace(/\s*\n\s*/g, " ").trim();
+}
+
 /**
- * Gera o corpo de uma interface TypeScript a partir das colunas de uma tabela.
+ * Gera o corpo de uma interface TypeScript a partir das colunas de uma tabela/view.
  * DB-agnóstico: recebe o mapeamento de tipos do provider (ex.: NUMBER→number).
+ * O bloco JSDoc do objeto traz kind, comentário, PK, UNIQUE, CHECK e relacionamentos.
  */
 export function generateInterface(
   schema: string,
   table: string,
   columns: ColumnInfo[],
   typeToTs: TypeMapper,
-  lastDdlTime?: string,
+  meta: InterfaceMeta,
 ): string {
   const ifaceName = toPascalCase(table);
+
+  // Mapa coluna → FK de saída, para anotar a coluna com seu alvo.
+  const colToFk = new Map<string, string>();
+  for (const fk of meta.foreignKeys ?? []) {
+    fk.columns.forEach((col, i) => {
+      const ref = fk.referencedColumns[i] ?? fk.referencedColumns[0];
+      colToFk.set(col, `${fk.referencedOwner}.${fk.referencedTable}.${ref}`);
+    });
+  }
+
   const lines = columns.map((c) => {
     const tsType = typeToTs(c.dataType);
     const key = IDENT.test(c.name) ? c.name : JSON.stringify(c.name);
     const opt = c.nullable ? "?" : "";
     const nul = c.nullable ? " | null" : "";
-    return `  /** ${c.dataType}${c.nullable ? " (nullable)" : ""} */\n  ${key}${opt}: ${tsType}${nul};`;
+    const parts = [`${c.dataType}${c.nullable ? " (nullable)" : ""}`];
+    if (c.comment) parts.push(safeComment(c.comment));
+    const fk = colToFk.get(c.name);
+    if (fk) parts.push(`FK → ${fk}`);
+    return `  /** ${parts.join(" — ")} */\n  ${key}${opt}: ${tsType}${nul};`;
   });
-  const header = `// ${schema}.${table}\n// last_ddl: ${lastDdlTime ?? "unknown"}\n// gerado por dba-master — não editar à mão`;
-  return `${header}\nexport interface ${ifaceName} {\n${lines.join("\n")}\n}\n`;
+
+  // Bloco JSDoc do objeto: só emite se houver algo além das colunas.
+  const doc: string[] = [];
+  if (meta.comment) doc.push(safeComment(meta.comment));
+  if (meta.primaryKey?.length) doc.push(`PK: ${meta.primaryKey.join(", ")}`);
+  for (const idx of meta.indexes ?? []) {
+    if (idx.unique) doc.push(`UNIQUE: ${idx.indexName} (${idx.columns.join(", ")})`);
+  }
+  for (const ck of meta.checkConstraints ?? []) {
+    doc.push(`CHECK: ${ck.name} (${safeComment(ck.condition)})`);
+  }
+  for (const fk of meta.foreignKeys ?? []) {
+    doc.push(`FK → ${fk.referencedOwner}.${fk.referencedTable} (${fk.columns.join(", ")} → ${fk.referencedColumns.join(", ")})`);
+  }
+  for (const fk of meta.incoming ?? []) {
+    // incoming: fk.referenced* é ESTA tabela; fk.columns/table são a tabela filha.
+    doc.push(`referenciada por ← ${fk.referencedOwner}.${fk.referencedTable} (${fk.columns.join(", ")} → ${fk.referencedColumns.join(", ")})`);
+  }
+  const docBlock = doc.length ? `/**\n${doc.map((l) => ` * ${l}`).join("\n")}\n */\n` : "";
+
+  const header = `// ${schema}.${table}\n// kind: ${meta.kind}\n// last_ddl: ${meta.lastDdlTime ?? "unknown"}\n// gerado por dba-master — não editar à mão`;
+  return `${header}\n${docBlock}export interface ${ifaceName} {\n${lines.join("\n")}\n}\n`;
 }
 
 /** Classifica um statement: true = escrita (DML/DDL/PLSQL), false = leitura (SELECT/WITH/EXPLAIN). */

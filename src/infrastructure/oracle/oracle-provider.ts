@@ -3,10 +3,10 @@ import type { Capabilities, DatabaseProvider } from "../../domain/database-provi
 import type {
   TableRef, TableSchema, ViewRef, ViewSchema, Relationships, DdlResult,
   ProcedureRef, PackageRef, ScheduledJob, RunSqlResult,
-  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo,
+  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo, CheckConstraint,
 } from "../../domain/types.js";
 import { OracleConnection } from "./oracle-connection.js";
-import { OracleQueries, type ColumnRow, type FkRow, type IndexRow } from "./oracle-queries.js";
+import { OracleQueries, type ColumnRow, type FkRow, type IndexRow, type CheckRow } from "./oracle-queries.js";
 
 // Adapter Oracle: implementa o port DatabaseProvider usando node-oracledb.
 // Concentra o que é específico do Oracle: driver, SQL ALL_*/DBMS_METADATA e mapeamento de tipos.
@@ -54,9 +54,11 @@ export class OracleProvider implements DatabaseProvider {
     const primaryKey = (await this.q.findPrimaryKey(owner, tab)).map((r) => r.COLUMN_NAME);
     const foreignKeys = groupOutgoing(await this.q.findOutgoingFks(owner, tab));
     const indexes = groupIndexes(await this.q.findIndexes(owner, tab));
+    const checkConstraints = mapChecks(await this.q.findCheckConstraints(owner, tab));
+    const comment = await this.q.findObjectComment(owner, tab);
     const lastDdlTime = await this.q.findLastDdlTime(owner, tab);
 
-    return { owner, tableName: tab, columns, primaryKey, foreignKeys, indexes, lastDdlTime };
+    return { owner, tableName: tab, columns, primaryKey, foreignKeys, indexes, checkConstraints, comment, lastDdlTime };
   }
 
   async getRelationships(table: string, schema?: string): Promise<Relationships> {
@@ -80,9 +82,10 @@ export class OracleProvider implements DatabaseProvider {
     if (cols.length === 0) throw new Error(`View não encontrada: ${owner}.${vw}`);
 
     const text = await this.q.findViewText(owner, vw);
+    const comment = await this.q.findObjectComment(owner, vw);
     const lastDdlTime = await this.q.findLastDdlTime(owner, vw, "VIEW");
 
-    return { owner, viewName: vw, columns: mapColumns(cols), text, lastDdlTime };
+    return { owner, viewName: vw, columns: mapColumns(cols), text, comment, lastDdlTime };
   }
 
   async getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult> {
@@ -210,7 +213,18 @@ function mapColumns(cols: ColumnRow[]): ColumnInfo[] {
     dataPrecision: c.DATA_PRECISION,
     dataScale: c.DATA_SCALE,
     dataDefault: c.DATA_DEFAULT?.trim() ?? null,
+    comment: c.COMMENTS?.trim() ?? null,
   }));
+}
+
+// Oracle grava NOT NULL como check constraint `"COL" IS NOT NULL` — a nullability
+// já vem da coluna, então descartamos essas para não poluir o JSDoc.
+const NOT_NULL_CHECK = /^"?\w+"?\s+IS\s+NOT\s+NULL$/i;
+
+function mapChecks(rows: CheckRow[]): CheckConstraint[] {
+  return rows
+    .map((r) => ({ name: r.CONSTRAINT_NAME, condition: (r.SEARCH_CONDITION ?? "").trim() }))
+    .filter((c) => c.condition && !NOT_NULL_CHECK.test(c.condition));
 }
 
 

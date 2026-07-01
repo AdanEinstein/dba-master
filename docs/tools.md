@@ -7,10 +7,10 @@ por outro agente de IA — não para leitura humana direta.
 |---|---|---|
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
-| `describe_table` | Colunas (tipo, nullable, default), PK, FKs de saída, índices; gera a interface `.ts` em cache | `table`, `schema?` |
+| `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera a interface `.ts` em cache | `table`, `schema?` |
 | `list_views` | Lista views (owner, nome) | `schema?`, `pattern?` |
-| `describe_view` | Colunas (tipo, nullable) e o SELECT que define a view; gera a interface `.ts` em cache | `view`, `schema?` |
-| `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?` |
+| `describe_view` | Colunas (tipo, nullable, comentário) e o SELECT que define a view; gera a interface `.ts` em cache | `view`, `schema?` |
+| `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
@@ -40,9 +40,16 @@ Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 ## Cache de tipos
 
 Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<OWNER>/<NOME>.ts` com uma
-`interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). A regeneração é
+`interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O header marca
+`// kind: table`/`// kind: view` e um bloco JSDoc traz comentário do objeto, PK, índices
+`UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e o
+comentário de cada coluna — pensado como base de conhecimento para o agente. A regeneração é
 **incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só
 reescreve se o objeto mudou. A resposta inclui `cacheFile` com o caminho gerado.
+
+Passe `force: true` (ou `--force` no CLI) para ignorar o cache e reescrever tudo — necessário
+na primeira execução após atualizar o dba-master, e para reconciliar a seção
+`referenciada por ←` (uma FK criada em outra tabela não altera o `LAST_DDL_TIME` desta).
 
 Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou
 `npx dba-master generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em

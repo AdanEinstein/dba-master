@@ -17,12 +17,13 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
         connectionName: connectionArg,
         schema: schemaArg,
         includeViews: z.boolean().optional().describe("Incluir views. Default: true."),
+        force: z.boolean().optional().describe("Ignora o cache incremental e reescreve tudo. Default: false."),
       }),
     },
-    async ({ connectionName, schema, includeViews }) => {
+    async ({ connectionName, schema, includeViews, force }) => {
       const db = provider.getProvider(connectionName);
       try {
-        const r = await generateInterfaces(db, cfg.cacheDir, { schema, includeViews });
+        const r = await generateInterfaces(db, cfg.cacheDir, { schema, includeViews, force });
         return jsonResult({
           tables: r.tables,
           views: r.views,

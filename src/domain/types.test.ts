@@ -17,16 +17,43 @@ assert.deepEqual(oracle.capabilities, { packages: true, scheduledJobs: true });
 
 // Geração de interface: nullable vira opcional + | null; nome inválido é quotado
 const cols: ColumnInfo[] = [
-  { name: "ID", dataType: "NUMBER", nullable: false },
+  { name: "ID", dataType: "NUMBER", nullable: false, comment: "identificador" },
   { name: "NOME", dataType: "VARCHAR2", nullable: true },
   { name: "2ND_COL", dataType: "DATE", nullable: false },
+  { name: "DEPT_ID", dataType: "NUMBER", nullable: true },
 ];
-const iface = generateInterface("HR", "EMPLOYEES", cols, oracle.typeToTs.bind(oracle), "2026-07-01T00:00:00.000Z");
+const iface = generateInterface("HR", "EMPLOYEES", cols, oracle.typeToTs.bind(oracle), {
+  kind: "table",
+  lastDdlTime: "2026-07-01T00:00:00.000Z",
+  comment: "Funcionários",
+  primaryKey: ["ID"],
+  foreignKeys: [
+    { constraintName: "FK_DEPT", columns: ["DEPT_ID"], referencedOwner: "HR", referencedTable: "DEPARTMENTS", referencedColumns: ["DEPT_ID"] },
+  ],
+  incoming: [
+    { constraintName: "FK_BON", columns: ["EMP_ID"], referencedOwner: "HR", referencedTable: "BONUS", referencedColumns: ["ID"] },
+  ],
+  checkConstraints: [{ name: "CK_SAL", condition: "SALARY > 0" }],
+  indexes: [{ indexName: "UX_NOME", unique: true, columns: ["NOME"] }],
+});
 assert.match(iface, /export interface Employees {/);
 assert.match(iface, /\bID: number;/);
 assert.match(iface, /\bNOME\?: string \| null;/);
 assert.match(iface, /"2ND_COL": Date;/);
 assert.match(iface, /last_ddl: 2026-07-01T00:00:00\.000Z/);
+// marcação table/view, comentário e relacionamentos
+assert.match(iface, /\/\/ kind: table/);
+assert.match(iface, /identificador/); // comentário de coluna
+assert.match(iface, /PK: ID/);
+assert.match(iface, /UNIQUE: UX_NOME \(NOME\)/);
+assert.match(iface, /CHECK: CK_SAL \(SALARY > 0\)/);
+assert.match(iface, /FK → HR\.DEPARTMENTS \(DEPT_ID → DEPT_ID\)/);
+assert.match(iface, /referenciada por ← HR\.BONUS/);
+assert.match(iface, /FK → HR\.DEPARTMENTS\.DEPT_ID/); // anotação na coluna
+
+// view: marcação kind e sem bloco de relacionamentos
+const viewIface = generateInterface("HR", "EMP_VIEW", cols, oracle.typeToTs.bind(oracle), { kind: "view" });
+assert.match(viewIface, /\/\/ kind: view/);
 
 // readCachedDdlTime lê o header e ignora "unknown"
 assert.equal(readCachedDdlTime(iface), "2026-07-01T00:00:00.000Z");
