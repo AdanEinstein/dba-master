@@ -20,9 +20,14 @@ export interface GenerateResult {
   errors: { name: string; error: string }[];
 }
 
-// ponytail: reusa describeTable/describeView (traz PK/FK/índices/text que a interface não usa) —
-// simples e o cache incremental pula reescrita de arquivos inalterados. Se compilar schema
-// gigante ficar lento, adicionar um método column-only no provider.
+// ponytail: worker-pool caseiro. Concorrência = poolMax; mais que isso só
+// enfileira no pool sem ganho. p-limit se algum dia precisar de mais controle.
+async function mapPool<T>(items: T[], limit: number, fn: (t: T) => Promise<void>) {
+  let i = 0;
+  const worker = async () => { while (i < items.length) await fn(items[i++]); };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
 export async function generateInterfaces(
   db: DatabaseProvider,
   cacheDir: string,
@@ -38,11 +43,11 @@ export async function generateInterfaces(
   let done = 0;
 
   const typeToTs = db.typeToTs.bind(db);
+  const poolMax = 4; // Limite de concorrência
 
   let tables = 0;
-  for (const t of tableRefs) {
+  await mapPool(tableRefs, poolMax, async (t) => {
     const name = `${t.owner}.${t.tableName}`;
-    opts.onProgress?.(++done, total, name);
     try {
       const s = await db.describeTable(t.tableName, t.owner);
       // FKs de entrada não vêm do describeTable — buscadas à parte (usamos só .incoming).
@@ -61,13 +66,14 @@ export async function generateInterfaces(
       tables++;
     } catch (e) {
       errors.push({ name, error: msg(e) });
+    } finally {
+      opts.onProgress?.(++done, total, name);
     }
-  }
+  });
 
   let views = 0;
-  for (const v of viewRefs) {
+  await mapPool(viewRefs, poolMax, async (v) => {
     const name = `${v.owner}.${v.viewName}`;
-    opts.onProgress?.(++done, total, name);
     try {
       const s = await db.describeView(v.viewName, v.owner);
       const meta = { kind: "view" as const, lastDdlTime: s.lastDdlTime, comment: s.comment };
@@ -75,8 +81,10 @@ export async function generateInterfaces(
       views++;
     } catch (e) {
       errors.push({ name, error: msg(e) });
+    } finally {
+      opts.onProgress?.(++done, total, name);
     }
-  }
+  });
 
   return { tables, views, files, errors };
 }
