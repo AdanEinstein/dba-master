@@ -1,6 +1,21 @@
 # Instalação e configuração
 
-## Setup
+Duas formas: **via npm** (sem clonar, credenciais no ambiente) ou **a partir do repo** (dev).
+
+## Via npm (`npx`)
+
+Não precisa clonar nem buildar. As credenciais vão no bloco `env` do cliente MCP — o pacote
+instalado via `npx` **não tem `.env` ao lado**, então a config vem das variáveis de ambiente.
+Ver [release.md](release.md) para o snippet completo.
+
+```bash
+claude mcp add dba-master \
+  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
+  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -- npx -y dba-master
+```
+
+## Setup a partir do repo (dev)
 
 ```bash
 npm install

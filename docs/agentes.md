@@ -33,10 +33,17 @@ bash agents/install.sh --agent copilot  # só um
 
 ## Outros clientes MCP (manual)
 
-Transporte STDIO padrão:
+Transporte STDIO padrão, a partir do repo buildado:
 
 ```jsonc
 { "command": "node", "args": ["<proj>/dist/index.js"] }
+```
+
+Ou sem o repo, via npm (credenciais no `env`, pois não há `.env` no pacote — ver
+[release.md](release.md)):
+
+```jsonc
+{ "command": "npx", "args": ["-y", "dba-master"], "env": { "ORACLE_USER": "...", "ORACLE_PASSWORD": "...", "ORACLE_CONNECT_STRING": "host:1521/service_name" } }
 ```
 
 A chave do bloco varia por cliente (`mcpServers`, `servers`+`type:stdio`, `mcp`+`type:local`).

@@ -7,12 +7,17 @@
     "dba-master": "dist/index.js"
   },
   "main": "dist/index.js",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/domain/types.test.ts"
+    "test": "tsx src/domain/types.test.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",

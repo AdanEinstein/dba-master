@@ -12,6 +12,17 @@ Oracle é um adapter; adicionar outro banco é criar um novo adapter, sem tocar 
 
 ## Quick start
 
+**Sem clonar** (via npm), credenciais no bloco `env` do cliente MCP:
+
+```bash
+claude mcp add dba-master \
+  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
+  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -- npx -y dba-master
+```
+
+**A partir do repo** (dev):
+
 ```bash
 npm install
 cp .env.example .env   # edite com suas credenciais Oracle
@@ -41,6 +52,7 @@ Referência completa: [docs/tools.md](docs/tools.md).
 - [docs/tools.md](docs/tools.md) — referência das 9 tools, parâmetros, capability flag, cache.
 - [docs/arquitetura.md](docs/arquitetura.md) — ports & adapters, camadas, como adicionar um banco novo, `READ_ONLY`.
 - [docs/agentes.md](docs/agentes.md) — instalação nos agentes de IA (`agents/`).
+- [docs/release.md](docs/release.md) — uso via `npx` sem o repo e como cortar um release (CI/CD).
 
 ## Verificação
 

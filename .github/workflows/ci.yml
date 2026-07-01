@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # ponytail: npm install (não ci) — lockfile é gitignored neste projeto, não há
+      # package-lock.json versionado. Adicionar cache do npm se o lockfile passar a ser commitado.
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
