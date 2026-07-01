@@ -150,11 +150,11 @@ uma vez** — todas as tabelas (e views) viram `interface` `.ts` em `CACHE_DIR` 
 `.dba-master/types`). Mesmo estilo do `install`, roda via `npx`:
 
 ```bash
-npx -y dba-master@latestgenerate                 # todas as tabelas + views
-npx -y dba-master@latestgenerate --schema HR     # só o schema HR
-npx -y dba-master@latestgenerate --no-views      # pula views
-npx -y dba-master@latestgenerate --connection prod   # conexão nomeada
-npx -y dba-master@latestgenerate --force         # ignora o cache e reescreve tudo
+npx -y dba-master@latest generate                 # todas as tabelas + views
+npx -y dba-master@latest generate --schema HR     # só o schema HR
+npx -y dba-master@latest generate --no-views      # pula views
+npx -y dba-master@latest generate --connection prod   # conexão nomeada
+npx -y dba-master@latest generate --force         # ignora o cache e reescreve tudo
 ```
 
 Incremental (valida por hash do conteúdo para pular reescrita). Também disponível como tool MCP
