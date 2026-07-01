@@ -15,7 +15,7 @@ funciona manualmente (ver fim) — o server é STDIO padrão.
 O novo instalador interativo configura tanto o servidor MCP quanto as skills/comandos para os agentes que você escolher.
 
 ```bash
-npx -y dba-master install
+npx -y dba-master@latest install
 ```
 
 Siga as instruções na tela para:

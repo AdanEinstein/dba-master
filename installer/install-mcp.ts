@@ -117,7 +117,7 @@ export function installMcp(argv: string[]): void {
       `\n⚠️  Credenciais não estavam no ambiente — gravei placeholders <DB_USER>/<DB_PASSWORD>/<DB_CONNECT_STRING>.`,
     );
     console.log(
-      `   Edite os configs, ou reinstale com as vars setadas:\n   DB_USER=... DB_PASSWORD=... DB_CONNECT_STRING=host:1521/service npx -y dba-master install`,
+      `   Edite os configs, ou reinstale com as vars setadas:\n   DB_USER=... DB_PASSWORD=... DB_CONNECT_STRING=host:1521/service npx -y dba-master@latest install`,
     );
   }
   console.log(`\nServer MCP 'dba-master' registrado (${isGlobal ? "global" : "project scoped"}). Reinicie o agente para carregar.`);

@@ -6,11 +6,11 @@ Duas vias combináveis, ambas subcomandos da própria bin (via `npx`, sem o repo
 
 ## Instalador Unificado (Interativo)
 
-Registra o server e a skill (`npx -y dba-master install`) na configuração dos agentes escolhidos em um único fluxo iterativo. As credenciais vêm do ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.env` ao lado); ausentes viram placeholders `<VAR>` para editar depois.
+Registra o server e a skill (`npx -y dba-master@latest install`) na configuração dos agentes escolhidos em um único fluxo iterativo. As credenciais vêm do ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.env` ao lado); ausentes viram placeholders `<VAR>` para editar depois.
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install
+  npx -y dba-master@latest install
 ```
 
 Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code

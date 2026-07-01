@@ -9,7 +9,7 @@ O jeito mais simples é o subcomando `install`, que registra o servidor MCP `npx
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install
+  npx -y dba-master@latest install
 ```
 
 Sem as vars no ambiente, grava placeholders `<DB_USER>` etc. para editar depois.

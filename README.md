@@ -12,7 +12,7 @@ Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx`.
 **1. Iniciar o instalador unificado**
 
 ```bash
-npx -y dba-master install
+npx -y dba-master@latest install
 ```
 
 O comando abrirá uma interface interativa onde você poderá:
