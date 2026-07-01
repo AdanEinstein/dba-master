@@ -5,6 +5,8 @@ import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+export const DEFAULT_POOL_MAX = 8;
+
 export interface ConnectionConfig {
   engine: string;
   user: string;
@@ -62,7 +64,14 @@ export function loadConfig(): Config {
     }
   }
 
-  const defaultPoolMax = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 8;
+  let defaultPoolMax = DEFAULT_POOL_MAX;
+  if (process.env.DB_POOL_MAX) {
+    const parsed = parseInt(process.env.DB_POOL_MAX, 10);
+    if (!Number.isNaN(parsed)) {
+      defaultPoolMax = parsed;
+    }
+  }
+
   for (const key of Object.keys(connections)) {
     if (connections[key].poolMax === undefined) {
       connections[key].poolMax = defaultPoolMax;

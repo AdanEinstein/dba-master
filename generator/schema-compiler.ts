@@ -1,5 +1,6 @@
 import type { DatabaseProvider } from "../src/domain/database-provider.js";
 import { writeTableCache } from "../src/infrastructure/schema-cache.js";
+import { DEFAULT_POOL_MAX } from "../src/config.js";
 
 // Compila em lote: varre tabelas (e views) do schema e gera/atualiza as interfaces .ts.
 // Composição DB-agnóstica sobre describeTable/describeView + writeTableCache (incremental).
@@ -49,7 +50,7 @@ export async function generateInterfaces(
   let done = 0;
 
   const typeToTs = db.typeToTs.bind(db);
-  const poolMax = opts.poolMax ?? 8; // Limite de concorrência
+  const poolMax = opts.poolMax ?? DEFAULT_POOL_MAX; // Limite de concorrência
 
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {

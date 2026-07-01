@@ -1,5 +1,5 @@
 import oracledb from "oracledb";
-import type { ConnectionConfig } from "../../config.js";
+import { type ConnectionConfig, DEFAULT_POOL_MAX } from "../../config.js";
 
 // Conexão específica do Oracle: pool node-oracledb e execução de queries cruas.
 
@@ -23,7 +23,7 @@ export class OracleConnection {
       password: this.cfg.password,
       connectString: this.cfg.connectString,
       poolMin: 0,
-      poolMax: this.cfg.poolMax ?? 8,
+      poolMax: this.cfg.poolMax ?? DEFAULT_POOL_MAX,
     });
     return this.pool;
   }
