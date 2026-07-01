@@ -4,6 +4,7 @@ package-lock.json
 /.cache/
 /docs/superpowers/**
 .env
+.claude.json
 
 # DBA-Master
 .dba-master

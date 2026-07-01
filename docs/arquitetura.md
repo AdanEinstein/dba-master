@@ -23,12 +23,13 @@ src/
     schema-cache.ts                 # geração das interfaces .ts (DB-agnóstico)
     provider-factory.ts             # switch(engine) → provider
   schema-compiler.ts                # generateInterfaces: lote sobre describe* + writeTableCache
-  cli-generate.ts                   # subcomando `npx dba-master generate`
   mcp/
     shared.ts                       # jsonResult/errorResult + args zod
     register.ts                     # registra todas as tools, injetando o provider
     tools/*.tool.ts                 # uma tool por arquivo, cada uma register(server, provider)
   index.ts                          # composition root: config → provider → tools
+installer/                          # subcomando `npx dba-master install` (UI @clack + cfonts)
+generator/                          # subcomando `npx dba-master generate` (UI @clack + cfonts)
 ```
 
 Fluxo de dependência unidirecional: `mcp` → port ← `infrastructure`, com `domain`
@@ -56,7 +57,8 @@ pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis e
 Para compilar o schema inteiro de uma vez, `schema-compiler.ts` (`generateInterfaces`) compõe
 `describe*` + `writeTableCache` num laço sobre `listTables`/`listViews`. Exposto de dois modos,
 ambos incrementais: a tool MCP `generate_interfaces` e o subcomando CLI `npx dba-master generate`
-(`cli-generate.ts`, standalone: `loadConfig` → `ProviderManager` → `generateInterfaces`).
+(pasta `generator/`, com UI animada @clack/cfonts; standalone: `loadConfig` → `ProviderManager`
+→ `generateInterfaces`, que emite progresso via `onProgress` para o spinner).
 
 ## Semântica do `READ_ONLY`
 

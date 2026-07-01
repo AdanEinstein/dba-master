@@ -7,6 +7,8 @@ import { writeTableCache } from "./infrastructure/schema-cache.js";
 export interface GenerateOptions {
   schema?: string;
   includeViews?: boolean; // default: true
+  /** Callback de progresso (para spinner/animação). Chamado a cada objeto processado. */
+  onProgress?: (done: number, total: number, name: string) => void;
 }
 
 export interface GenerateResult {
@@ -28,27 +30,34 @@ export async function generateInterfaces(
   const errors: { name: string; error: string }[] = [];
   const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+  const tableRefs = await db.listTables(opts.schema);
+  const viewRefs = opts.includeViews !== false ? await db.listViews(opts.schema) : [];
+  const total = tableRefs.length + viewRefs.length;
+  let done = 0;
+
   let tables = 0;
-  for (const t of await db.listTables(opts.schema)) {
+  for (const t of tableRefs) {
+    const name = `${t.owner}.${t.tableName}`;
+    opts.onProgress?.(++done, total, name);
     try {
       const s = await db.describeTable(t.tableName, t.owner);
       files.push(await writeTableCache(cacheDir, s.owner, s.tableName, s.columns, db.typeToTs.bind(db), s.lastDdlTime));
       tables++;
     } catch (e) {
-      errors.push({ name: `${t.owner}.${t.tableName}`, error: msg(e) });
+      errors.push({ name, error: msg(e) });
     }
   }
 
   let views = 0;
-  if (opts.includeViews !== false) {
-    for (const v of await db.listViews(opts.schema)) {
-      try {
-        const s = await db.describeView(v.viewName, v.owner);
-        files.push(await writeTableCache(cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(db), s.lastDdlTime));
-        views++;
-      } catch (e) {
-        errors.push({ name: `${v.owner}.${v.viewName}`, error: msg(e) });
-      }
+  for (const v of viewRefs) {
+    const name = `${v.owner}.${v.viewName}`;
+    opts.onProgress?.(++done, total, name);
+    try {
+      const s = await db.describeView(v.viewName, v.owner);
+      files.push(await writeTableCache(cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(db), s.lastDdlTime));
+      views++;
+    } catch (e) {
+      errors.push({ name, error: msg(e) });
     }
   }
 
