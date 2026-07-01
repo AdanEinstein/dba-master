@@ -74,6 +74,6 @@ export function loadConfig(): Config {
     readOnly: process.env.READ_ONLY?.toLowerCase() !== "false",
     cacheDir: process.env.CACHE_DIR
       ? resolve(process.env.CACHE_DIR)
-      : resolve(dirname(usedPath), ".cache"),
+      : resolve(dirname(usedPath), "types"),
   };
 }

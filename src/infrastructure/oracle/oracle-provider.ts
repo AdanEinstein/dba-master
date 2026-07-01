@@ -1,12 +1,12 @@
 import type { Config, ConnectionConfig } from "../../config.js";
 import type { Capabilities, DatabaseProvider } from "../../domain/database-provider.js";
 import type {
-  TableRef, TableSchema, Relationships, DdlResult,
+  TableRef, TableSchema, ViewRef, ViewSchema, Relationships, DdlResult,
   ProcedureRef, PackageRef, ScheduledJob, RunSqlResult,
   ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo,
 } from "../../domain/types.js";
 import { OracleConnection } from "./oracle-connection.js";
-import { OracleQueries, type FkRow, type IndexRow } from "./oracle-queries.js";
+import { OracleQueries, type ColumnRow, type FkRow, type IndexRow } from "./oracle-queries.js";
 
 // Adapter Oracle: implementa o port DatabaseProvider usando node-oracledb.
 // Concentra o que é específico do Oracle: driver, SQL ALL_*/DBMS_METADATA e mapeamento de tipos.
@@ -49,16 +49,7 @@ export class OracleProvider implements DatabaseProvider {
 
     const cols = await this.q.findColumns(owner, tab);
     if (cols.length === 0) throw new Error(`Tabela não encontrada: ${owner}.${tab}`);
-
-    const columns: ColumnInfo[] = cols.map((c) => ({
-      name: c.COLUMN_NAME,
-      dataType: c.DATA_TYPE,
-      nullable: c.NULLABLE === "Y",
-      dataLength: c.DATA_LENGTH,
-      dataPrecision: c.DATA_PRECISION,
-      dataScale: c.DATA_SCALE,
-      dataDefault: c.DATA_DEFAULT?.trim() ?? null,
-    }));
+    const columns = mapColumns(cols);
 
     const primaryKey = (await this.q.findPrimaryKey(owner, tab)).map((r) => r.COLUMN_NAME);
     const foreignKeys = groupOutgoing(await this.q.findOutgoingFks(owner, tab));
@@ -74,6 +65,24 @@ export class OracleProvider implements DatabaseProvider {
     const outgoing = groupOutgoing(await this.q.findOutgoingFks(owner, tab));
     const incoming = groupIncoming(await this.q.findIncomingFks(owner, tab));
     return { owner, tableName: tab, outgoing, incoming };
+  }
+
+  async listViews(schema?: string, pattern?: string): Promise<ViewRef[]> {
+    const rows = await this.q.findViews(schema, pattern);
+    return rows.map((r) => ({ owner: r.OWNER, viewName: r.VIEW_NAME }));
+  }
+
+  async describeView(view: string, schema?: string): Promise<ViewSchema> {
+    const owner = await this.resolveViewOwner(view, schema);
+    const vw = view.toUpperCase();
+
+    const cols = await this.q.findColumns(owner, vw);
+    if (cols.length === 0) throw new Error(`View não encontrada: ${owner}.${vw}`);
+
+    const text = await this.q.findViewText(owner, vw);
+    const lastDdlTime = await this.q.findLastDdlTime(owner, vw, "VIEW");
+
+    return { owner, viewName: vw, columns: mapColumns(cols), text, lastDdlTime };
   }
 
   async getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult> {
@@ -167,6 +176,17 @@ export class OracleProvider implements DatabaseProvider {
     return rows[0].OWNER;
   }
 
+  private async resolveViewOwner(view: string, schema?: string): Promise<string> {
+    if (schema) return schema.toUpperCase();
+    const rows = await this.q.findViewOwners(view);
+    if (rows.length === 0) throw new Error(`View não encontrada: ${view}`);
+    if (rows.length > 1)
+      throw new Error(
+        `View ${view} existe em múltiplos schemas: ${rows.map((r) => r.OWNER).join(", ")}. Informe 'schema'.`,
+      );
+    return rows[0].OWNER;
+  }
+
   private async loadArguments(owner: string, objectName: string, packageName: string | null): Promise<ArgumentInfo[]> {
     const rows = await this.q.findArguments(owner, objectName, packageName);
     return rows.map((r) => ({
@@ -178,7 +198,21 @@ export class OracleProvider implements DatabaseProvider {
   }
 }
 
-// --- Agrupamento de FKs / índices (linhas Oracle → DTO) -------------------
+// --- Colunas / FKs / índices (linhas Oracle → DTO) ------------------------
+
+/** Mapeia linhas de all_tab_columns → ColumnInfo. Usado por tabelas e views. */
+function mapColumns(cols: ColumnRow[]): ColumnInfo[] {
+  return cols.map((c) => ({
+    name: c.COLUMN_NAME,
+    dataType: c.DATA_TYPE,
+    nullable: c.NULLABLE === "Y",
+    dataLength: c.DATA_LENGTH,
+    dataPrecision: c.DATA_PRECISION,
+    dataScale: c.DATA_SCALE,
+    dataDefault: c.DATA_DEFAULT?.trim() ?? null,
+  }));
+}
+
 
 function groupOutgoing(rows: FkRow[]): ForeignKey[] {
   const map = new Map<string, ForeignKey>();

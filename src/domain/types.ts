@@ -32,6 +32,24 @@ export interface IndexInfo {
   columns: string[];
 }
 
+// --- Modelos de view ----------------------------------------------------
+
+export interface ViewRef {
+  owner: string;
+  viewName: string;
+}
+
+/** Descreve uma view: colunas + o SELECT que a define. Views não têm PK/FK/índices. */
+export interface ViewSchema {
+  owner: string;
+  viewName: string;
+  columns: ColumnInfo[];
+  /** O SELECT da view (all_views.TEXT). */
+  text: string;
+  /** Timestamp da última mudança de DDL — usado pelo cache incremental. */
+  lastDdlTime?: string;
+}
+
 /** Retornado pelo provider: descreve a tabela sem o artefato de cache. */
 export interface TableSchema {
   owner: string;

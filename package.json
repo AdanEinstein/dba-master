@@ -19,7 +19,7 @@
     "start": "node dist/src/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/domain/types.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\" \"generator/**/*.test.ts\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

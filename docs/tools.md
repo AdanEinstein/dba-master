@@ -8,6 +8,9 @@ por outro agente de IA — não para leitura humana direta.
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
 | `describe_table` | Colunas (tipo, nullable, default), PK, FKs de saída, índices; gera a interface `.ts` em cache | `table`, `schema?` |
+| `list_views` | Lista views (owner, nome) | `schema?`, `pattern?` |
+| `describe_view` | Colunas (tipo, nullable) e o SELECT que define a view; gera a interface `.ts` em cache | `view`, `schema?` |
+| `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
@@ -36,7 +39,11 @@ Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ## Cache de tipos
 
-Em cada `describe_table`, a tabela vira `CACHE_DIR/<OWNER>/<TABELA>.ts` com uma `interface`
-TypeScript. A regeneração é **incremental**: compara o `LAST_DDL_TIME` gravado no header do
-arquivo com o do banco e só reescreve se a tabela mudou. A resposta inclui `cacheFile` com o
-caminho gerado. Detalhes em [arquitetura.md](arquitetura.md).
+Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<OWNER>/<NOME>.ts` com uma
+`interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). A regeneração é
+**incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só
+reescreve se o objeto mudou. A resposta inclui `cacheFile` com o caminho gerado.
+
+Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou
+`npx dba-master generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em
+[arquitetura.md](arquitetura.md).

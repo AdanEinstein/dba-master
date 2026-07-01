@@ -21,6 +21,12 @@ if (process.argv[2] === "install") {
   process.exit(0);
 }
 
+if (process.argv[2] === "generate") {
+  const { runGenerate } = await import("../generator/index.js");
+  await runGenerate(process.argv.slice(3));
+  process.exit(0);
+}
+
 // Composition root: config → provider (adapter) → tools. Trocar de banco é só o DB_ENGINE.
 
 const cfg = loadConfig();

@@ -27,6 +27,10 @@ src/
     register.ts                     # registra todas as tools, injetando o provider
     tools/*.tool.ts                 # uma tool por arquivo, cada uma register(server, provider)
   index.ts                          # composition root: config → provider → tools
+installer/                          # subcomando `npx dba-master install` (UI @clack + cfonts)
+generator/                          # subcomando `npx dba-master generate`
+  schema-compiler.ts                # generateInterfaces: lote sobre describe* + writeTableCache
+  index.ts                          # CLI: UI @clack + cfonts, spinner com progresso
 ```
 
 Fluxo de dependência unidirecional: `mcp` → port ← `infrastructure`, com `domain`
@@ -45,10 +49,17 @@ Nada muda em `domain/`, `mcp/tools/*` nem `index.ts`.
 
 ## Cache incremental de tipos
 
-`describe_table` gera `CACHE_DIR/<OWNER>/<TABELA>.ts` com uma `interface`. O mapeamento de
+`describe_table`/`describe_view` geram `CACHE_DIR/<OWNER>/<NOME>.ts` com uma `interface`
+(default de `CACHE_DIR`: `.dba-master/types`, ao lado do `connections.json`). O mapeamento de
 tipos vem do provider (`typeToTs` — específico do banco), então o cache é DB-agnóstico.
 O header do arquivo grava o `LAST_DDL_TIME`; na próxima chamada, se bater, a geração é
 pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis em código.
+
+Para compilar o schema inteiro de uma vez, `schema-compiler.ts` (`generateInterfaces`) compõe
+`describe*` + `writeTableCache` num laço sobre `listTables`/`listViews`. Exposto de dois modos,
+ambos incrementais: a tool MCP `generate_interfaces` e o subcomando CLI `npx dba-master generate`
+(pasta `generator/`, com UI animada @clack/cfonts; standalone: `loadConfig` → `ProviderManager`
+→ `generateInterfaces`, que emite progresso via `onProgress` para o spinner).
 
 ## Semântica do `READ_ONLY`
 
