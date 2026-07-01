@@ -5,24 +5,19 @@ sem clonar nem buildar.
 
 ## Usar sem o repositório (usuário final)
 
-No config do cliente MCP, aponte para o pacote npm. As credenciais vão no bloco `env`
-(o pacote instalado via `npx` **não tem `.env` ao lado** — a config vem do ambiente):
+O jeito mais simples é o subcomando `install-mcp`, que registra `npx -y dba-master` no config
+de cada agente e grava as credenciais no bloco `env` (o pacote npx **não tem `.env` ao lado**
+— a config vem do ambiente):
 
-```jsonc
-{
-  "command": "npx",
-  "args": ["-y", "dba-master"],
-  "env": {
-    "ORACLE_USER": "usuario",
-    "ORACLE_PASSWORD": "senha",
-    "ORACLE_CONNECT_STRING": "host:1521/service_name",
-    "SCHEMA_FILTER": "",
-    "READ_ONLY": "true"
-  }
-}
+```bash
+ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+  npx -y dba-master install-mcp                 # todos os agentes
+  npx -y dba-master install-mcp --agent claude  # só um
 ```
 
-No Claude Code:
+Sem as vars no ambiente, grava placeholders `<ORACLE_USER>` etc. para editar depois.
+
+No Claude Code, alternativamente via CLI:
 
 ```bash
 claude mcp add dba-master \
@@ -31,11 +26,18 @@ claude mcp add dba-master \
   -- npx -y dba-master
 ```
 
-Ou instale global e chame o binário direto:
+Ou config manual em qualquer cliente MCP:
 
-```bash
-npm i -g dba-master
-# config MCP: { "command": "dba-master", "env": { ... } }
+```jsonc
+{
+  "command": "npx",
+  "args": ["-y", "dba-master"],
+  "env": {
+    "ORACLE_USER": "usuario",
+    "ORACLE_PASSWORD": "senha",
+    "ORACLE_CONNECT_STRING": "host:1521/service_name"
+  }
+}
 ```
 
 Modo **thin** (default) não exige Oracle Instant Client. Variáveis completas em

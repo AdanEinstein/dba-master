@@ -1,18 +1,25 @@
 # dba-master
 
-Servidor MCP (Model Context Protocol) em Node.js/TypeScript que dá a um agente de IA
-introspecção profunda de um banco **Oracle** — estrutura, DDL, relacionamentos, procedures,
-jobs — para que ele investigue o schema e proponha soluções (queries, ajustes de modelagem,
-diagnósticos) com assertividade.
+Servidor MCP (Model Context Protocol) que dá a um agente de IA introspecção profunda de um
+banco **Oracle** — estrutura, DDL, relacionamentos, procedures, jobs — em **JSON estruturado**,
+para investigar o schema e propor soluções (queries, modelagem, diagnósticos) com assertividade.
 
-As respostas são **JSON estruturado**, pensadas para consumo por outro agente. A introspecção
-usa as views `ALL_*`, cobrindo **todos os schemas acessíveis** ao usuário conectado, e persiste
-um **cache incremental** de interfaces TypeScript por tabela. A arquitetura é **ports & adapters**:
-Oracle é um adapter; adicionar outro banco é criar um novo adapter, sem tocar em domínio/tools.
+Modo **thin** (default) é JS puro e não exige Oracle Instant Client.
 
-## Quick start
+## Instalação
 
-**Sem clonar** (via npm), credenciais no bloco `env` do cliente MCP:
+Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx`.
+
+**1. Registrar o server MCP** nos agentes (Claude, Copilot, Opencode, Antigravity). As
+credenciais vão no ambiente e são gravadas no bloco `env` do config de cada agente:
+
+```bash
+ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+  npx -y dba-master install-mcp                 # todos os agentes
+  npx -y dba-master install-mcp --agent claude  # só um
+```
+
+No Claude Code, alternativamente via CLI:
 
 ```bash
 claude mcp add dba-master \
@@ -21,42 +28,47 @@ claude mcp add dba-master \
   -- npx -y dba-master
 ```
 
-**A partir do repo** (dev):
+**2. Instalar o comando `dba-investigate`** (workflow que orienta o agente a usar as tools):
 
 ```bash
-npm install
-cp .env.example .env   # edite com suas credenciais Oracle
-npm run build
-claude mcp add dba-master -- node "$(pwd)/dist/index.js"
+npx -y dba-master install-agents                # todos os agentes
 ```
 
-Modo **thin** (default) não exige Oracle Instant Client. Detalhes: [docs/instalacao.md](docs/instalacao.md).
+Reabra/recarregue o agente após instalar.
 
-## Tools
+### Variáveis de ambiente
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `ORACLE_USER` / `ORACLE_PASSWORD` | sim | Credenciais |
+| `ORACLE_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
+| `SCHEMA_FILTER` | não | Schemas separados por vírgula; vazio = todos os acessíveis |
+| `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql` |
+| `ORACLE_CLIENT_MODE` | não | `thin` (default) ou `thick` |
+
+## Uso
+
+Depois de instalado, o agente ganha as tools MCP e o comando `/dba-investigate`. Descreva a
+demanda (ex.: "otimize esta query", "modele X") e o agente investiga o schema com as tools:
 
 | Tool | O que faz |
 |---|---|
 | `list_tables` / `search_tables` | Lista/busca tabelas |
-| `describe_table` | Colunas, PK, FKs, índices; gera interface `.ts` em cache |
+| `describe_table` | Colunas, PK, FKs, índices |
 | `get_relationships` | Grafo de FKs (entrada e saída) |
 | `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type |
 | `list_procedures` / `list_packages` | PL/SQL com assinatura de parâmetros |
 | `list_schedulers_jobs` | Jobs agendados |
 | `run_sql` | SQL (read-only por padrão) |
 
-Referência completa: [docs/tools.md](docs/tools.md).
+As respostas são JSON estruturado, pensadas para consumo pelo agente.
 
 ## Documentação
 
-- [docs/instalacao.md](docs/instalacao.md) — setup, `.env`, variáveis de ambiente, verificação.
-- [docs/tools.md](docs/tools.md) — referência das 9 tools, parâmetros, capability flag, cache.
-- [docs/arquitetura.md](docs/arquitetura.md) — ports & adapters, camadas, como adicionar um banco novo, `READ_ONLY`.
-- [docs/agentes.md](docs/agentes.md) — instalação nos agentes de IA (`agents/`).
-- [docs/release.md](docs/release.md) — uso via `npx` sem o repo e como cortar um release (CI/CD).
+Guias completos no repositório:
 
-## Verificação
-
-```bash
-npm run typecheck   # tsc --noEmit
-npm test            # self-check sem banco
-```
+- `docs/instalacao.md` — setup a partir do repo, todas as variáveis, verificação.
+- `docs/tools.md` — referência das 9 tools, parâmetros, capability flag, cache.
+- `docs/agentes.md` — instalação nos agentes de IA (destinos por agente).
+- `docs/arquitetura.md` — ports & adapters, como adicionar um banco novo, `READ_ONLY`.
+- `docs/release.md` — publicação no npm e como cortar um release (CI/CD).

@@ -6,46 +6,46 @@ Instala o **dba-master** num agente de IA, em duas vias independentes (combináv
 2. **Skill/comando `dba-investigate`** — um workflow que ensina o agente a usar as tools
    para investigar o schema e propor soluções.
 
-Scripts cobrem 4 agentes: `claude` · `copilot` · `opencode` · `antigravity`.
-Qualquer outro cliente MCP funciona manualmente (ver fim) — o server é STDIO padrão.
-
-> Buildar o projeto e configurar `.env`: ver [../docs/instalacao.md](../docs/instalacao.md).
+Ambas as vias são **subcomandos da própria bin** (via `npx`, sem clonar o repo), cobrindo
+4 agentes: `claude` · `copilot` · `opencode` · `antigravity`. Qualquer outro cliente MCP
+funciona manualmente (ver fim) — o server é STDIO padrão.
 
 ## 1. Servidor MCP
 
-Pré-requisito: `npm run build` (gera `dist/`) e `.env` preenchido na raiz.
+Registra o comando `npx -y dba-master`. As credenciais vêm do ambiente e são gravadas no
+bloco `env` de cada config (o pacote npx não tem `.env` ao lado); se ausentes, viram
+placeholders `<VAR>` para editar depois.
 
 ```bash
-bash agents/install_mcp.sh                  # todos os agentes
-bash agents/install_mcp.sh --agent claude   # só um
+ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+  npx -y dba-master install-mcp                 # todos os agentes
+  npx -y dba-master install-mcp --agent claude  # só um
 ```
 
-Comando registrado: `node <proj>/dist/index.js`. Destinos do config:
+Destinos do config (só globais, no `~`):
 
 | Agente          | Arquivo                                  | Tipo |
 | --------------- | ---------------------------------------- | ---- |
 | Claude Desktop  | `~/.claude/claude_desktop_config.json`   | stdio |
-| Claude Code CLI | `~/.claude.json` (por projeto)           | stdio |
-| Claude Code VSCode | `<proj>/.vscode/mcp.json`             | stdio |
+| Claude Code     | `~/.claude.json` (user scope)            | stdio |
 | Copilot CLI     | `~/.copilot/mcp-config.json`             | local |
-| Copilot VS Code | `<proj>/.vscode/mcp.json` (por workspace)| stdio |
 | Opencode        | `~/.config/opencode/opencode.json`       | local |
 | Antigravity     | `~/.gemini/config/mcp_config.json`       | stdio |
 
-**Claude Code** — recomendado via CLI (não Desktop config):
+**Claude Code** — alternativa via CLI:
 ```bash
-claude mcp add dba-master -s user -- node <proj>/dist/index.js
+claude mcp add dba-master -s user \
+  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
+  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -- npx -y dba-master
 ```
-
-O `.env` é lido da raiz do projeto (relativo ao módulo), então não é preciso injetar
-credenciais no config de cada agente.
 
 ### Qualquer outro cliente MCP (manual)
 
-Transporte STDIO padrão. Cole no config MCP do agente:
+Transporte STDIO padrão. Cole no config MCP do agente (credenciais no `env`):
 
 ```jsonc
-{ "command": "node", "args": ["<proj>/dist/index.js"] }
+{ "command": "npx", "args": ["-y", "dba-master"], "env": { "ORACLE_USER": "...", "ORACLE_PASSWORD": "...", "ORACLE_CONNECT_STRING": "host:1521/service_name" } }
 ```
 
 Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli),
@@ -53,13 +53,11 @@ Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli),
 
 ## 2. Skill/comando `dba-investigate`
 
-Subcomando da própria bin (cross-platform, sem bash) — funciona via npm ou a partir do repo:
+Subcomando análogo, sem credenciais:
 
 ```bash
-npx -y dba-master install-agents                 # via npm (sem o repo)
+npx -y dba-master install-agents                 # todos
 npx -y dba-master install-agents --agent claude  # só um
-
-node dist/index.js install-agents                # a partir do repo (após npm run build)
 ```
 
 Fonte em `agents/commands/dba-investigate.md`. Cada agente recebe o formato nativo:

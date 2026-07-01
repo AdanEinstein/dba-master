@@ -1,36 +1,43 @@
 # Instalação nos agentes de IA
 
-Scripts em `agents/` instalam o dba-master em agentes de IA, em duas vias combináveis, para
+Duas vias combináveis, ambas subcomandos da própria bin (via `npx`, sem o repo), para
 `claude` · `copilot` · `opencode` · `antigravity`. Detalhes completos em
 [../agents/INSTALL.md](../agents/INSTALL.md).
 
 ## Servidor MCP
 
-Registra o server (`node <proj>/dist/index.js`) no config de cada agente. Requer
-`npm run build` e `.env` na raiz.
+Registra o server (`npx -y dba-master`) no config de cada agente. As credenciais vêm do
+ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.env` ao lado);
+ausentes viram placeholders `<VAR>` para editar depois.
 
 ```bash
-bash agents/install_mcp.sh                  # todos
-bash agents/install_mcp.sh --agent claude   # só um
+ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+  npx -y dba-master install-mcp                 # todos
+  npx -y dba-master install-mcp --agent claude  # só um
 ```
 
-No Claude Code, o caminho recomendado é a própria CLI:
+Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
+(`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
+(`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
+
+No Claude Code, alternativamente via CLI:
 
 ```bash
-claude mcp add dba-master -s user -- node <proj>/dist/index.js
+claude mcp add dba-master -s user \
+  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
+  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -- npx -y dba-master
 ```
 
 ## Skill/comando `dba-investigate`
 
 Instala o workflow que orienta o agente a investigar o schema com as tools e propor
 soluções. Fonte única em `agents/commands/dba-investigate.md`, adaptada ao formato nativo
-de cada agente (slash command, skill pessoal ou workflow). É um subcomando da própria bin:
+de cada agente (slash command, skill pessoal ou workflow):
 
 ```bash
-npx -y dba-master install-agents                 # via npm (sem o repo)
+npx -y dba-master install-agents                 # todos
 npx -y dba-master install-agents --agent copilot # só um
-
-node dist/index.js install-agents                # a partir do repo (após npm run build)
 ```
 
 ## Outros clientes MCP (manual)

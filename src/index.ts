@@ -13,11 +13,16 @@ import { loadConfig } from "./config.js";
 import { createProvider } from "./infrastructure/provider-factory.js";
 import { registerTools } from "./mcp/register.js";
 
-// Subcomando de instalação da skill dba-investigate nos agentes (uso via npx, sem repo).
-// Import dinâmico: não carrega fs/instalador no caminho do server MCP.
+// Subcomandos de instalação nos agentes (uso via npx, sem repo). Import dinâmico:
+// não carrega fs/instalador no caminho do server MCP.
 if (process.argv[2] === "install-agents") {
   const { installAgents } = await import("./install-agents.js");
   installAgents(process.argv.slice(3));
+  process.exit(0);
+}
+if (process.argv[2] === "install-mcp") {
+  const { installMcp } = await import("./install-mcp.js");
+  installMcp(process.argv.slice(3));
   process.exit(0);
 }
 
