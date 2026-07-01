@@ -37,7 +37,7 @@ Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só 
 | `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
 | `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
 | `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `./.cache`) |
+| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/types`) |
 
 O `.env` é lido da **raiz do projeto** (relativo ao módulo), então o server acha as
 credenciais mesmo quando iniciado por um agente a partir de outro diretório.
@@ -66,6 +66,22 @@ Claude Desktop, em `claude_desktop_config.json`:
   }
 }
 ```
+
+## Gerar interfaces do schema
+
+Compila em lote as `interface` TypeScript de todas as tabelas (e views) para `CACHE_DIR`
+(default `.dba-master/types`). Mesmo estilo do `install` — roda via `npx`, sem clonar:
+
+```bash
+npx -y dba-master generate                 # todas as tabelas + views dos schemas acessíveis
+npx -y dba-master generate --schema HR     # só o schema HR
+npx -y dba-master generate --no-views      # pula views
+npx -y dba-master generate --connection prod   # escolhe a conexão nomeada
+```
+
+Usa as credenciais do `connections.json` (gravado pelo `install`) ou do `.env`. É
+**incremental**: objetos com `LAST_DDL_TIME` inalterado não são reescritos. Também disponível
+como tool MCP `generate_interfaces` para o agente chamar sob demanda.
 
 ## Verificação
 

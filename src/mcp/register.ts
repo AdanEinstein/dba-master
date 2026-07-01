@@ -14,6 +14,7 @@ import * as listProcedures from "./tools/list-procedures.tool.js";
 import * as listPackages from "./tools/list-packages.tool.js";
 import * as listSchedulersJobs from "./tools/list-schedulers-jobs.tool.js";
 import * as runSql from "./tools/run-sql.tool.js";
+import * as generateInterfaces from "./tools/generate-interfaces.tool.js";
 
 /** Registra todas as tools no servidor, injetando o provider (e config onde preciso). */
 export function registerTools(server: McpServer, provider: ProviderManager, cfg: Config): void {
@@ -29,4 +30,5 @@ export function registerTools(server: McpServer, provider: ProviderManager, cfg:
   listPackages.register(server, provider);
   listSchedulersJobs.register(server, provider);
   runSql.register(server, provider, cfg);
+  generateInterfaces.register(server, provider, cfg);
 }

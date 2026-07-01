@@ -22,6 +22,8 @@ src/
       oracle-provider.ts            # implements DatabaseProvider: query + transforma linha→DTO + typeToTs
     schema-cache.ts                 # geração das interfaces .ts (DB-agnóstico)
     provider-factory.ts             # switch(engine) → provider
+  schema-compiler.ts                # generateInterfaces: lote sobre describe* + writeTableCache
+  cli-generate.ts                   # subcomando `npx dba-master generate`
   mcp/
     shared.ts                       # jsonResult/errorResult + args zod
     register.ts                     # registra todas as tools, injetando o provider
@@ -45,10 +47,16 @@ Nada muda em `domain/`, `mcp/tools/*` nem `index.ts`.
 
 ## Cache incremental de tipos
 
-`describe_table` gera `CACHE_DIR/<OWNER>/<TABELA>.ts` com uma `interface`. O mapeamento de
+`describe_table`/`describe_view` geram `CACHE_DIR/<OWNER>/<NOME>.ts` com uma `interface`
+(default de `CACHE_DIR`: `.dba-master/types`, ao lado do `connections.json`). O mapeamento de
 tipos vem do provider (`typeToTs` — específico do banco), então o cache é DB-agnóstico.
 O header do arquivo grava o `LAST_DDL_TIME`; na próxima chamada, se bater, a geração é
 pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis em código.
+
+Para compilar o schema inteiro de uma vez, `schema-compiler.ts` (`generateInterfaces`) compõe
+`describe*` + `writeTableCache` num laço sobre `listTables`/`listViews`. Exposto de dois modos,
+ambos incrementais: a tool MCP `generate_interfaces` e o subcomando CLI `npx dba-master generate`
+(`cli-generate.ts`, standalone: `loadConfig` → `ProviderManager` → `generateInterfaces`).
 
 ## Semântica do `READ_ONLY`
 

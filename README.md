@@ -120,7 +120,23 @@ Caso o arquivo não seja encontrado, o sistema possui um fallback para ler a con
 | `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
 | `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
 | `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/.cache`) |
+| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `.dba-master/types`) |
+
+### Gerar interfaces do schema
+
+Além da geração sob demanda no `describe_table`/`describe_view`, dá para **compilar tudo de
+uma vez** — todas as tabelas (e views) viram `interface` `.ts` em `CACHE_DIR` (default
+`.dba-master/types`). Mesmo estilo do `install`, roda via `npx`:
+
+```bash
+npx -y dba-master generate                 # todas as tabelas + views
+npx -y dba-master generate --schema HR     # só o schema HR
+npx -y dba-master generate --no-views      # pula views
+npx -y dba-master generate --connection prod   # conexão nomeada
+```
+
+Incremental (pula objetos com `LAST_DDL_TIME` inalterado). Também disponível como tool MCP
+`generate_interfaces` para o agente chamar sob demanda.
 
 ### Verificação
 
@@ -146,6 +162,9 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `connectionName`, `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
 | `describe_table` | Colunas (tipo, nullable, default), PK, FKs de saída, índices; gera interface `.ts` | `table`, `schema?` |
+| `list_views` | Lista views (owner, nome) | `schema?`, `pattern?` |
+| `describe_view` | Colunas e o SELECT da view; gera interface `.ts` | `view`, `schema?` |
+| `generate_interfaces` | Compila em lote a interface `.ts` de todas as tabelas (e views) do schema | `schema?`, `includeViews?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions com assinatura de parâmetros | `schema?`, `pattern?` |
@@ -168,4 +187,4 @@ Com `READ_ONLY=true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (I
 
 ### Cache de tipos
 
-Em cada `describe_table`, a tabela vira `CACHE_DIR/<OWNER>/<TABELA>.ts` com uma `interface` TypeScript. A regeneração é **incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só reescreve se a tabela mudou. A resposta inclui `cacheFile` com o caminho gerado.
+Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<OWNER>/<NOME>.ts` com uma `interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). A regeneração é **incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só reescreve se o objeto mudou. A resposta inclui `cacheFile` com o caminho gerado. Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou `npx dba-master generate` (CLI).
