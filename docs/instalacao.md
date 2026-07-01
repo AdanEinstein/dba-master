@@ -73,10 +73,10 @@ Compila em lote as `interface` TypeScript de todas as tabelas (e views) para `CA
 (default `.dba-master/types`). Mesmo estilo do `install` — roda via `npx`, sem clonar:
 
 ```bash
-npx -y dba-master generate                 # todas as tabelas + views dos schemas acessíveis
-npx -y dba-master generate --schema HR     # só o schema HR
-npx -y dba-master generate --no-views      # pula views
-npx -y dba-master generate --connection prod   # escolhe a conexão nomeada
+npx -y dba-master@latestgenerate                 # todas as tabelas + views dos schemas acessíveis
+npx -y dba-master@latestgenerate --schema HR     # só o schema HR
+npx -y dba-master@latestgenerate --no-views      # pula views
+npx -y dba-master@latestgenerate --connection prod   # escolhe a conexão nomeada
 ```
 
 Usa as credenciais do `connections.json` (gravado pelo `install`) ou do `.env`. É

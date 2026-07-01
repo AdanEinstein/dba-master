@@ -89,7 +89,7 @@ Reabra/recarregue o agente após instalar. O agente vai ganhar as ferramentas MC
 **2. Gerar as interfaces do schema (opcional)**
 
 ```bash
-npx -y dba-master generate            # compila todas as tabelas + views em .ts
+npx -y dba-master@latest generate            # compila todas as tabelas + views em .ts
 ```
 
 Popula o `CACHE_DIR` de uma vez com as interfaces TypeScript de todo o schema — ver
@@ -138,11 +138,11 @@ uma vez** — todas as tabelas (e views) viram `interface` `.ts` em `CACHE_DIR` 
 `.dba-master/types`). Mesmo estilo do `install`, roda via `npx`:
 
 ```bash
-npx -y dba-master generate                 # todas as tabelas + views
-npx -y dba-master generate --schema HR     # só o schema HR
-npx -y dba-master generate --no-views      # pula views
-npx -y dba-master generate --connection prod   # conexão nomeada
-npx -y dba-master generate --force         # ignora o cache e reescreve tudo
+npx -y dba-master@latestgenerate                 # todas as tabelas + views
+npx -y dba-master@latestgenerate --schema HR     # só o schema HR
+npx -y dba-master@latestgenerate --no-views      # pula views
+npx -y dba-master@latestgenerate --connection prod   # conexão nomeada
+npx -y dba-master@latestgenerate --force         # ignora o cache e reescreve tudo
 ```
 
 Incremental (pula objetos com `LAST_DDL_TIME` inalterado). Também disponível como tool MCP
