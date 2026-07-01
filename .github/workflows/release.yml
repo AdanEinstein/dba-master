@@ -16,6 +16,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm test
+      - run: sed -i "s/__VERSION__/${GITHUB_REF_NAME#v}/g" src/index.ts
       - run: npm run build
       # Versão publicada vem da tag: v1.2.0 -> 1.2.0
       - run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version

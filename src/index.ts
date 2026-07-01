@@ -33,7 +33,7 @@ const provider = createProvider(cfg);
 
 serveStdio(() => {
   const server = new McpServer(
-    { name: "dba-master", version: "1.0.0" },
+    { name: "dba-master", version: "__VERSION__" },
     { capabilities: { tools: {} } },
   );
   registerTools(server, provider, cfg);
