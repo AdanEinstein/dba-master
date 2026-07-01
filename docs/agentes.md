@@ -17,10 +17,10 @@ Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + C
 (`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
 O workflow interativo de skill `dba-investigate` também será posicionado nos diretórios de configuração apropriados para o agente escolhido.
 
-No Claude Code, alternativamente via CLI (Apenas servidor MCP — credenciais no `connections.json`, via `npx -y dba-master configure`):
+No Claude Code, alternativamente via CLI (Apenas servidor MCP — credenciais no `connections.json`, via `npx -y dba-master@latest configure`):
 
 ```bash
-claude mcp add dba-master -s user -- npx -y dba-master
+claude mcp add dba-master -s user -- npx -y dba-master@latest
 ```
 
 ## Outros clientes MCP (manual)
@@ -31,7 +31,7 @@ Transporte STDIO padrão, a partir do repo buildado:
 { "command": "node", "args": ["<proj>/dist/index.js"] }
 ```
 
-Ou sem o repo, via npm (credenciais no `connections.json`, criado com `npx -y dba-master configure` — sem bloco `env`):
+Ou sem o repo, via npm (credenciais no `connections.json`, criado com `npx -y dba-master@latest configure` — sem bloco `env`):
 
 ```jsonc
 { "command": "npx", "args": ["-y", "dba-master"] }

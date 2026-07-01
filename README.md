@@ -73,10 +73,10 @@ Para gerenciar as conexões existentes de forma isolada (criar, editar ou exclui
 npx -y dba-master@latest configure
 ```
 
-No Claude Code, alternativamente via CLI (apenas registro do server MCP — as credenciais vêm do `connections.json`, criado com `npx -y dba-master configure`):
+No Claude Code, alternativamente via CLI (apenas registro do server MCP — as credenciais vêm do `connections.json`, criado com `npx -y dba-master@latest configure`):
 
 ```bash
-claude mcp add dba-master -s user -- npx -y dba-master
+claude mcp add dba-master -s user -- npx -y dba-master@latest
 ```
 
 Outros clientes MCP (manual, via stdio) — sem bloco `env`, pois as credenciais vivem no `connections.json`:
@@ -126,7 +126,7 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
 }
 ```
 
-Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
+Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
@@ -169,7 +169,7 @@ arquivos antigos (o cache pula objetos inalterados via validação de hash).
 Com um banco Oracle acessível, valide as tools via [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
-npx @modelcontextprotocol/inspector npx -y dba-master
+npx @modelcontextprotocol/inspector npx -y dba-master@latest
 ```
 *(Se estiver no repositório local, use `npx @modelcontextprotocol/inspector node dist/index.js`)*
 

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 
 const KEY = "dba-master";
 const COMMAND = "npx";
-const ARGS = ["-y", "dba-master"];
+const ARGS = ["-y", "dba-master@latest"];
 
 // Lê/mescla/grava JSON preservando o resto do arquivo. mutate recebe o objeto raiz.
 function updateJson(file: string, mutate: (data: Record<string, unknown>) => void): void {

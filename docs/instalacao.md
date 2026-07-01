@@ -11,8 +11,8 @@ prompts interativos de `configure` (ou `install`). O registro do server MCP no c
 tem bloco `env`:
 
 ```bash
-npx -y dba-master configure          # cria/edita o connections.json (prompts interativos)
-claude mcp add dba-master -- npx -y dba-master
+npx -y dba-master@latest configure          # cria/edita o connections.json (prompts interativos)
+claude mcp add dba-master -- npx -y dba-master@latest
 ```
 
 ## Setup a partir do repo (dev)

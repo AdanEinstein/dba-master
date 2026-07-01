@@ -5,18 +5,18 @@ sem clonar nem buildar.
 
 ## Usar sem o repositório (usuário final)
 
-O jeito mais simples é o subcomando `install`, que coleta as credenciais em prompts interativos (gravando no `connections.json`), registra o servidor MCP `npx -y dba-master` no config de cada agente e instala a skill respectiva:
+O jeito mais simples é o subcomando `install`, que coleta as credenciais em prompts interativos (gravando no `connections.json`), registra o servidor MCP `npx -y dba-master@latest` no config de cada agente e instala a skill respectiva:
 
 ```bash
 npx -y dba-master@latest install
 ```
 
-Para só gerenciar as conexões (sem reinstalar os agentes), use `npx -y dba-master configure`.
+Para só gerenciar as conexões (sem reinstalar os agentes), use `npx -y dba-master@latest configure`.
 
 No Claude Code, alternativamente via CLI (credenciais no `connections.json`):
 
 ```bash
-claude mcp add dba-master -- npx -y dba-master
+claude mcp add dba-master -- npx -y dba-master@latest
 ```
 
 Ou config manual em qualquer cliente MCP — sem bloco `env`, pois as credenciais vivem no `connections.json`:
