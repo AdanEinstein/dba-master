@@ -86,6 +86,15 @@ Outros clientes MCP (manual, via stdio):
 
 Reabra/recarregue o agente após instalar. O agente vai ganhar as ferramentas MCP e o comando `/dba-investigate` (workflow que orienta o agente a usar as tools).
 
+**2. Gerar as interfaces do schema (opcional)**
+
+```bash
+npx -y dba-master generate            # compila todas as tabelas + views em .ts
+```
+
+Popula o `CACHE_DIR` de uma vez com as interfaces TypeScript de todo o schema — ver
+[Gerar interfaces do schema](#gerar-interfaces-do-schema) para flags e detalhes.
+
 ### Setup a partir do repositório (dev)
 
 ```bash
