@@ -30,7 +30,7 @@ export interface DatabaseProvider {
   typeToTs(dataType: string): string;
 
   /** last_ddl_time de todas as tabelas/views do schema, em UMA query (fast-path do cache). */
-  listDdlTimes(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]>;
+  listDdlTimes?(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]>;
 
   listTables(schema?: string): Promise<TableRef[]>;
   searchTables(pattern: string, schema?: string): Promise<TableRef[]>;

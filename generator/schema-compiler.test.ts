@@ -15,11 +15,7 @@ const stub = {
     { owner: "HR", tableName: "EMPLOYEES", numRows: 1 },
     { owner: "HR", tableName: "DEPARTMENTS", numRows: 1 },
   ],
-  listDdlTimes: async () => [
-    { owner: "HR", name: "EMPLOYEES", lastDdlTime: "2024-01-01T12:00:00Z" },
-    { owner: "HR", name: "DEPARTMENTS", lastDdlTime: "2024-01-01T12:00:00Z" },
-    { owner: "HR", name: "EMP_VIEW", lastDdlTime: "2024-01-01T12:00:00Z" },
-  ],
+  listDdlTimes: async () => [],
   describeTable: async (table: string, schema?: string): Promise<TableSchema> => {
     (stub as any).describeTableCalls = ((stub as any).describeTableCalls || 0) + 1;
     return {
@@ -66,6 +62,12 @@ assert.ok(!existsSync(join(dir2, "HR", "EMP_VIEW.ts")));
 // Teste incremental (fast-path): segunda chamada com mesmos ddl times não deve chamar describe
 const describeTableCallsBefore = (stub as any).describeTableCalls || 0;
 const describeViewCallsBefore = (stub as any).describeViewCalls || 0;
+
+stub.listDdlTimes = async () => [
+  { owner: "HR", name: "EMPLOYEES", lastDdlTime: "2024-01-01T12:00:00Z" },
+  { owner: "HR", name: "DEPARTMENTS", lastDdlTime: "2024-01-01T12:00:00Z" },
+  { owner: "HR", name: "EMP_VIEW", lastDdlTime: "2024-01-01T12:00:00Z" },
+];
 
 const r3 = await generateInterfaces(stub, dir); // usando o primeiro diretório (dir) que já tem cache
 assert.equal(r3.tables, 2);

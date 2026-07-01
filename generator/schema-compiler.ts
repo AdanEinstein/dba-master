@@ -25,6 +25,16 @@ export interface GenerateResult {
   errors: { name: string; error: string }[];
 }
 
+async function checkCacheHit(file: string, targetDdl: string | undefined): Promise<boolean> {
+  if (!targetDdl) return false;
+  try {
+    const existing = await readFile(file, "utf8");
+    return readCachedDdlTime(existing) === targetDdl;
+  } catch {
+    return false;
+  }
+}
+
 // ponytail: worker-pool caseiro. Concorrência = poolMax; mais que isso só
 // enfileira no pool sem ganho. p-limit se algum dia precisar de mais controle.
 async function mapPool<T>(items: T[], limit: number, fn: (t: T) => Promise<void>) {
@@ -69,21 +79,13 @@ export async function generateInterfaces(
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {
     const name = `${t.owner}.${t.tableName}`;
+    const file = join(cacheDir, t.owner, `${t.tableName}.ts`);
 
-    if (!opts.force && ddlCache.has(name)) {
-      const targetDdl = ddlCache.get(name);
-      const file = join(cacheDir, t.owner, `${t.tableName}.ts`);
-      try {
-        const existing = await readFile(file, "utf8");
-        if (readCachedDdlTime(existing) === targetDdl) {
-          tables++; // Considera processado (cache hit)
-          files.push(file);
-          opts.onProgress?.(++done, total, name);
-          return;
-        }
-      } catch {
-        // arquivo não existe ou erro ao ler, prossegue para o describe
-      }
+    if (!opts.force && await checkCacheHit(file, ddlCache.get(name))) {
+      tables++; // Considera processado (cache hit)
+      files.push(file);
+      opts.onProgress?.(++done, total, name);
+      return;
     }
 
     try {
@@ -112,21 +114,13 @@ export async function generateInterfaces(
   let views = 0;
   await mapPool(viewRefs, poolMax, async (v) => {
     const name = `${v.owner}.${v.viewName}`;
+    const file = join(cacheDir, v.owner, `${v.viewName}.ts`);
 
-    if (!opts.force && ddlCache.has(name)) {
-      const targetDdl = ddlCache.get(name);
-      const file = join(cacheDir, v.owner, `${v.viewName}.ts`);
-      try {
-        const existing = await readFile(file, "utf8");
-        if (readCachedDdlTime(existing) === targetDdl) {
-          views++;
-          files.push(file);
-          opts.onProgress?.(++done, total, name);
-          return;
-        }
-      } catch {
-        // arquivo não existe ou erro ao ler, prossegue para o describe
-      }
+    if (!opts.force && await checkCacheHit(file, ddlCache.get(name))) {
+      views++;
+      files.push(file);
+      opts.onProgress?.(++done, total, name);
+      return;
     }
 
     try {
