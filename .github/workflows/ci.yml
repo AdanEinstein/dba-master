@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # ponytail: npm install (não ci) — lockfile é gitignored neste projeto, não há
       # package-lock.json versionado. Adicionar cache do npm se o lockfile passar a ser commitado.
       - run: npm install
