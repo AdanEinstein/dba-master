@@ -1,5 +1,6 @@
-// Camada de domínio: modelos (DTOs) e lógica pura, sem dependência de I/O.
+import { createHash } from "node:crypto";
 
+// Camada de domínio: modelos (DTOs) e lógica pura, sem dependência de I/O.
 // --- Modelos de tabela ---------------------------------------------------
 
 export interface ColumnInfo {
@@ -218,8 +219,10 @@ export function generateInterface(
   }
   const docBlock = doc.length ? `/**\n${doc.map((l) => ` * ${l}`).join("\n")}\n */\n` : "";
 
-  const header = `// ${schema}.${table}\n// kind: ${meta.kind}\n// last_ddl: ${meta.lastDdlTime ?? "unknown"}\n// gerado por dba-master — não editar à mão`;
-  return `${header}\n${docBlock}export interface ${ifaceName} {\n${lines.join("\n")}\n}\n`;
+  const body = `${docBlock}export interface ${ifaceName} {\n${lines.join("\n")}\n}\n`;
+  const hash = createHash("sha256").update(body).digest("hex");
+  const header = `// ${schema}.${table}\n// kind: ${meta.kind}\n// hash: ${hash}\n// gerado por dba-master — não editar à mão`;
+  return `${header}\n${body}`;
 }
 
 /** Classifica um statement: true = escrita (DML/DDL/PLSQL), false = leitura (SELECT/WITH/EXPLAIN). */

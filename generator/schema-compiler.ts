@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseProvider } from "../src/domain/database-provider.js";
-import { writeTableCache, readCachedDdlTime } from "../src/infrastructure/schema-cache.js";
+import { writeTableCache } from "../src/infrastructure/schema-cache.js";
 import { DEFAULT_POOL_MAX } from "../src/config.js";
 
 // Compila em lote: varre tabelas (e views) do schema e gera/atualiza as interfaces .ts.
@@ -25,15 +25,6 @@ export interface GenerateResult {
   errors: { name: string; error: string }[];
 }
 
-async function checkCacheHit(file: string, targetDdl: string | undefined): Promise<boolean> {
-  if (!targetDdl) return false;
-  try {
-    const existing = await readFile(file, "utf8");
-    return readCachedDdlTime(existing) === targetDdl;
-  } catch {
-    return false;
-  }
-}
 
 // ponytail: worker-pool caseiro. Concorrência = poolMax; mais que isso só
 // enfileira no pool sem ganho. p-limit se algum dia precisar de mais controle.
@@ -64,29 +55,12 @@ export async function generateInterfaces(
   const typeToTs = db.typeToTs.bind(db);
   const poolMax = opts.poolMax ?? DEFAULT_POOL_MAX; // Limite de concorrência
 
-  const ddlCache = new Map<string, string>();
-  if (!opts.force && db.listDdlTimes) {
-    try {
-      const times = await db.listDdlTimes(opts.schema);
-      for (const t of times) {
-        if (t.lastDdlTime) ddlCache.set(`${t.owner}.${t.name}`, t.lastDdlTime);
-      }
-    } catch {
-      // Ignora, caso listDdlTimes falhe (ou provedor lance erro de não implementado).
-    }
-  }
 
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {
     const name = `${t.owner}.${t.tableName}`;
     const file = join(cacheDir, t.owner, `${t.tableName}.ts`);
 
-    if (!opts.force && await checkCacheHit(file, ddlCache.get(name))) {
-      tables++; // Considera processado (cache hit)
-      files.push(file);
-      opts.onProgress?.(++done, total, name);
-      return;
-    }
 
     try {
       const s = await db.describeTable(t.tableName, t.owner);
@@ -116,12 +90,6 @@ export async function generateInterfaces(
     const name = `${v.owner}.${v.viewName}`;
     const file = join(cacheDir, v.owner, `${v.viewName}.ts`);
 
-    if (!opts.force && await checkCacheHit(file, ddlCache.get(name))) {
-      views++;
-      files.push(file);
-      opts.onProgress?.(++done, total, name);
-      return;
-    }
 
     try {
       const s = await db.describeView(v.viewName, v.owner);

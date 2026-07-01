@@ -48,7 +48,7 @@ assert.ok(existsSync(join(dir, "HR", "EMPLOYEES.ts")));
 assert.ok(existsSync(join(dir, "HR", "EMP_VIEW.ts")));
 const empSrc = readFileSync(join(dir, "HR", "EMPLOYEES.ts"), "utf8");
 assert.match(empSrc, /export interface Employees {/);
-assert.match(empSrc, /\/\/ kind: table/);
+assert.match(empSrc, /\/\/ hash: /);
 assert.match(empSrc, /FK → HR\.DEPARTMENTS/);
 assert.match(readFileSync(join(dir, "HR", "EMP_VIEW.ts"), "utf8"), /\/\/ kind: view/);
 
@@ -58,28 +58,5 @@ const r2 = await generateInterfaces(stub, dir2, { includeViews: false });
 assert.equal(r2.tables, 2);
 assert.equal(r2.views, 0);
 assert.ok(!existsSync(join(dir2, "HR", "EMP_VIEW.ts")));
-
-// Teste incremental (fast-path): segunda chamada com mesmos ddl times não deve chamar describe
-const describeTableCallsBefore = (stub as any).describeTableCalls || 0;
-const describeViewCallsBefore = (stub as any).describeViewCalls || 0;
-
-stub.listDdlTimes = async () => [
-  { owner: "HR", name: "EMPLOYEES", lastDdlTime: "2024-01-01T12:00:00Z" },
-  { owner: "HR", name: "DEPARTMENTS", lastDdlTime: "2024-01-01T12:00:00Z" },
-  { owner: "HR", name: "EMP_VIEW", lastDdlTime: "2024-01-01T12:00:00Z" },
-];
-
-const r3 = await generateInterfaces(stub, dir); // usando o primeiro diretório (dir) que já tem cache
-assert.equal(r3.tables, 2);
-assert.equal(r3.views, 1);
-assert.equal((stub as any).describeTableCalls, describeTableCallsBefore, "should have skipped describeTable");
-assert.equal((stub as any).describeViewCalls, describeViewCallsBefore, "should have skipped describeView");
-
-// Teste com force:true (mesmo com cache bate, deve recriar e chamar describe)
-const r4 = await generateInterfaces(stub, dir, { force: true });
-assert.equal(r4.tables, 2);
-assert.equal(r4.views, 1);
-assert.ok((stub as any).describeTableCalls > describeTableCallsBefore, "should have called describeTable");
-assert.ok((stub as any).describeViewCalls > describeViewCallsBefore, "should have called describeView");
 
 console.log("ok — schema-compiler.test.ts passou");

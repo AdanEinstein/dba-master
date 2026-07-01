@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { generateInterface, isWriteStatement, type ColumnInfo } from "./types.js";
-import { readCachedDdlTime } from "../infrastructure/schema-cache.js";
+import { readCachedHash } from "../infrastructure/schema-cache.js";
 import { OracleProvider } from "../infrastructure/oracle/oracle-provider.js";
 
 // Mapeamento de tipos do adapter Oracle (não instancia conexão — typeToTs é puro)
@@ -40,7 +40,7 @@ assert.match(iface, /export interface Employees {/);
 assert.match(iface, /\bID: number;/);
 assert.match(iface, /\bNOME\?: string \| null;/);
 assert.match(iface, /"2ND_COL": Date;/);
-assert.match(iface, /last_ddl: 2026-07-01T00:00:00\.000Z/);
+assert.match(iface, /\/\/ hash: [a-f0-9]{64}/);
 // marcação table/view, comentário e relacionamentos
 assert.match(iface, /\/\/ kind: table/);
 assert.match(iface, /identificador/); // comentário de coluna
@@ -55,10 +55,10 @@ assert.match(iface, /FK → HR\.DEPARTMENTS\.DEPT_ID/); // anotação na coluna
 const viewIface = generateInterface("HR", "EMP_VIEW", cols, oracle.typeToTs.bind(oracle), { kind: "view" });
 assert.match(viewIface, /\/\/ kind: view/);
 
-// readCachedDdlTime lê o header e ignora "unknown"
-assert.equal(readCachedDdlTime(iface), "2026-07-01T00:00:00.000Z");
-assert.equal(readCachedDdlTime("// last_ddl: unknown\n"), undefined);
-assert.equal(readCachedDdlTime("sem header"), undefined);
+// readCachedHash lê o header e extrai o hash
+const hashValue = readCachedHash(iface);
+assert.ok(hashValue && hashValue.length === 64);
+assert.equal(readCachedHash("sem header"), undefined);
 
 // Guarda de escrita: SELECT/WITH/EXPLAIN são leitura; resto é escrita
 assert.equal(isWriteStatement("SELECT * FROM t"), false);

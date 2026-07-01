@@ -4,20 +4,20 @@ import { generateInterface, type ColumnInfo, type InterfaceMeta, type TypeMapper
 
 // Infraestrutura DB-agnóstica: persiste o cache de interfaces .ts no filesystem.
 
-/** last_ddl gravado no header do arquivo de cache, se existir e não for "unknown". */
-export function readCachedDdlTime(content: string): string | undefined {
-  const m = content.match(/^\/\/ last_ddl: (.+)$/m);
-  return m && m[1] !== "unknown" ? m[1] : undefined;
+/** hash gravado no header do arquivo de cache. */
+export function readCachedHash(content: string): string | undefined {
+  const m = content.match(/^\/\/ hash: ([a-f0-9]+)$/m);
+  return m ? m[1] : undefined;
 }
 
 /**
- * Grava (incremental) a interface .ts da tabela/view em cacheDir/<OWNER>/<OBJ>.ts.
- * Se o LAST_DDL_TIME do header bater com o atual, pula a regeneração (a menos de `force`).
+ * Grava a interface .ts da tabela/view em cacheDir/<OWNER>/<OBJ>.ts.
+ * Se o hash do header bater com o atual, pula a regeneração (a menos de `force`).
  * O mapeamento de tipos vem do provider (DB-específico); `meta` traz kind/relacionamentos.
  *
- * ponytail: o cache é invalidado só pelo last_ddl do próprio objeto. Criar uma FK em
- * OUTRA tabela apontando p/ esta não altera o last_ddl daqui, então a seção
- * "referenciada por" pode ficar velha até um `force`. Upgrade path: hash do conteúdo.
+ * ponytail: o cache é invalidado pelo hash do conteúdo. Criar uma FK em
+ * OUTRA tabela apontando p/ esta altera o conteúdo (seção "referenciada por"),
+ * invalidando o cache corretamente.
  */
 export async function writeTableCache(
   cacheDir: string,
@@ -31,16 +31,18 @@ export async function writeTableCache(
   const dir = join(cacheDir, owner);
   const file = join(dir, `${table}.ts`);
 
-  if (!force && meta.lastDdlTime) {
+  const content = generateInterface(owner, table, columns, typeToTs, meta);
+
+  if (!force) {
     try {
       const existing = await readFile(file, "utf8");
-      if (readCachedDdlTime(existing) === meta.lastDdlTime) return file; // inalterada
+      if (readCachedHash(existing) === readCachedHash(content)) return file; // inalterada
     } catch {
       // arquivo não existe ainda — segue gerando
     }
   }
 
   await mkdir(dir, { recursive: true });
-  await writeFile(file, generateInterface(owner, table, columns, typeToTs, meta), "utf8");
+  await writeFile(file, content, "utf8");
   return file;
 }
