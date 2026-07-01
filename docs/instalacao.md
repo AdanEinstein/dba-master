@@ -1,0 +1,67 @@
+# Instalação e configuração
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env   # edite com suas credenciais
+npm run build          # compila para dist/
+```
+
+Modo **thin** (default) é JS puro e não exige Oracle Instant Client. Só use
+`ORACLE_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
+
+## Variáveis de ambiente
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `ORACLE_USER` / `ORACLE_PASSWORD` | sim | Credenciais |
+| `ORACLE_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
+| `DB_ENGINE` | não | Engine de banco (default `oracle`) |
+| `ORACLE_CLIENT_MODE` | não | `thin` (default) ou `thick` |
+| `ORACLE_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
+| `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
+| `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
+| `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `./.cache`) |
+
+O `.env` é lido da **raiz do projeto** (relativo ao módulo), então o server acha as
+credenciais mesmo quando iniciado por um agente a partir de outro diretório.
+
+## Registrar num cliente MCP
+
+Ver [agentes.md](agentes.md) para instalação automatizada nos agentes suportados, ou:
+
+```bash
+# Claude Code (CLI)
+claude mcp add dba-master -- node /caminho/para/dba-master/dist/index.js
+
+# modo dev sem build
+claude mcp add dba-master -- npx tsx /caminho/para/dba-master/src/index.ts
+```
+
+Claude Desktop, em `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "dba-master": {
+      "command": "node",
+      "args": ["/caminho/para/dba-master/dist/index.js"]
+    }
+  }
+}
+```
+
+## Verificação
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm test            # self-check do mapeamento de tipos e guarda read-only (sem banco)
+```
+
+Com um banco Oracle acessível, valide as tools via
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```bash
+npx @modelcontextprotocol/inspector node dist/index.js
+```
