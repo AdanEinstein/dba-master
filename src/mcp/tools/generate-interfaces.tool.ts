@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
 import type { Config } from "../../config.js";
-import { generateInterfaces } from "../../schema-compiler.js";
+import { generateInterfaces } from "../../../generator/schema-compiler.js";
 import { jsonResult, errorResult, schemaArg, connectionArg } from "../shared.js";
 
 // Compila em lote: gera/atualiza a interface .ts de todas as tabelas (e views) do schema.

@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { generateInterfaces } from "./schema-compiler.js";
-import type { DatabaseProvider } from "./domain/database-provider.js";
-import type { TableRef, TableSchema, ViewRef, ViewSchema, ColumnInfo } from "./domain/types.js";
+import type { DatabaseProvider } from "../src/domain/database-provider.js";
+import type { TableRef, TableSchema, ViewRef, ViewSchema, ColumnInfo } from "../src/domain/types.js";
 
 // Provider stub: 2 tabelas, 1 view. Só os métodos usados por generateInterfaces.
 const cols: ColumnInfo[] = [{ name: "ID", dataType: "NUMBER", nullable: false }];

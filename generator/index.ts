@@ -3,7 +3,7 @@ import cfonts from "cfonts";
 
 import { loadConfig } from "../src/config.js";
 import { ProviderManager } from "../src/infrastructure/provider-manager.js";
-import { generateInterfaces } from "../src/schema-compiler.js";
+import { generateInterfaces } from "./schema-compiler.js";
 
 // Subcomando `npx dba-master generate`: compila as interfaces .ts do schema, standalone.
 // UI animada no mesmo estilo do installer (cfonts + spinner @clack).

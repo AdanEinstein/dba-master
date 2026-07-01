@@ -1,5 +1,5 @@
-import type { DatabaseProvider } from "./domain/database-provider.js";
-import { writeTableCache } from "./infrastructure/schema-cache.js";
+import type { DatabaseProvider } from "../src/domain/database-provider.js";
+import { writeTableCache } from "../src/infrastructure/schema-cache.js";
 
 // Compila em lote: varre tabelas (e views) do schema e gera/atualiza as interfaces .ts.
 // Composição DB-agnóstica sobre describeTable/describeView + writeTableCache (incremental).
