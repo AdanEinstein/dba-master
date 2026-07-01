@@ -15,21 +15,25 @@ funciona manualmente (ver fim) — o server é STDIO padrão.
 O novo instalador interativo configura tanto o servidor MCP quanto as skills/comandos para os agentes que você escolher.
 
 ```bash
-DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install
+npx -y dba-master install
 ```
 
-Siga as instruções na tela para selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity). As credenciais vêm do ambiente e são gravadas no bloco `env` de cada config; se ausentes, viram placeholders `<VAR>` para editar depois.
+Siga as instruções na tela para:
+1. Configurar suas conexões de banco de dados (as credenciais serão salvas no arquivo `connections.json`).
+2. Escolher o escopo da instalação: **Global** (para todos os projetos) ou **Project scoped** (apenas para o projeto atual).
+3. Selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity).
 
-### Destinos do config (só globais, no `~`):
+### Destinos do config (Global vs Project scoped)
 
-| Agente          | Arquivo MCP                              | Arquivo de Skill/Command                       |
+Dependendo do escopo escolhido, os arquivos de configuração (ex: `mcpServers`) e as skills serão instalados na sua Home (`~`) ou na pasta do seu projeto local. O arquivo `connections.json` será gerado em `~/.dba-master/` (global) ou `./.dba-master/` (projeto).
+
+| Agente          | Arquivo MCP (Global / Local)             | Arquivo de Skill/Command (Global / Local)      |
 | --------------- | ---------------------------------------- | ---------------------------------------------- |
 | Claude Desktop  | `~/.claude/claude_desktop_config.json`   | N/A                                            |
-| Claude Code     | `~/.claude.json` (user scope)            | `~/.claude/commands/dba-investigate.md`        |
-| Copilot CLI     | `~/.copilot/mcp-config.json`             | `~/.copilot/skills/dba-investigate/SKILL.md`   |
-| Opencode        | `~/.config/opencode/opencode.json`       | `~/.config/opencode/command/dba-investigate.md`|
-| Antigravity     | `~/.gemini/config/mcp_config.json`       | `~/.gemini/workflows/dba-investigate.md`       |
+| Claude Code     | `~/.claude.json` / `./.claude.json`      | `~/.claude/commands/...`                       |
+| Copilot CLI     | `~/.copilot/mcp-config.json` / `./.copilot/mcp-config.json` | `~/.copilot/skills/dba-investigate/SKILL.md` / `./.copilot/...` |
+| Opencode        | `~/.config/opencode/opencode.json` / `./.opencode/opencode.json` | `~/.config/opencode/command/...` / `./.opencode/command/...` |
+| Antigravity     | `~/.gemini/config/mcp_config.json` / `./.agents/mcp_config.json` | `~/.gemini/skills/dba-investigate/SKILL.md` / `./.agents/skills/dba-investigate/SKILL.md` |
 
 **Claude Code** — alternativa via CLI:
 ```bash
@@ -41,10 +45,10 @@ claude mcp add dba-master -s user \
 
 ### Qualquer outro cliente MCP (manual)
 
-Transporte STDIO padrão. Cole no config MCP do agente (credenciais no `env`):
+O `dba-master` lê nativamente suas credenciais a partir de `.dba-master/connections.json`. Transporte STDIO padrão. Cole no config MCP do agente:
 
 ```jsonc
-{ "command": "npx", "args": ["-y", "dba-master"], "env": { "DB_USER": "...", "DB_PASSWORD": "...", "DB_CONNECT_STRING": "host:1521/service_name" } }
+{ "command": "npx", "args": ["-y", "dba-master"] }
 ```
 
 Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli), `servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
