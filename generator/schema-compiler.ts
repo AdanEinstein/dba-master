@@ -7,6 +7,8 @@ import { writeTableCache } from "../src/infrastructure/schema-cache.js";
 export interface GenerateOptions {
   schema?: string;
   includeViews?: boolean; // default: true
+  /** Ignora o cache incremental e reescreve todos os arquivos. */
+  force?: boolean;
   /** Callback de progresso (para spinner/animação). Chamado a cada objeto processado. */
   onProgress?: (done: number, total: number, name: string) => void;
 }
@@ -35,13 +37,27 @@ export async function generateInterfaces(
   const total = tableRefs.length + viewRefs.length;
   let done = 0;
 
+  const typeToTs = db.typeToTs.bind(db);
+
   let tables = 0;
   for (const t of tableRefs) {
     const name = `${t.owner}.${t.tableName}`;
     opts.onProgress?.(++done, total, name);
     try {
       const s = await db.describeTable(t.tableName, t.owner);
-      files.push(await writeTableCache(cacheDir, s.owner, s.tableName, s.columns, db.typeToTs.bind(db), s.lastDdlTime));
+      // FKs de entrada não vêm do describeTable — buscadas à parte (usamos só .incoming).
+      const { incoming } = await db.getRelationships(s.tableName, s.owner);
+      const meta = {
+        kind: "table" as const,
+        lastDdlTime: s.lastDdlTime,
+        comment: s.comment,
+        primaryKey: s.primaryKey,
+        foreignKeys: s.foreignKeys,
+        incoming,
+        checkConstraints: s.checkConstraints,
+        indexes: s.indexes,
+      };
+      files.push(await writeTableCache(cacheDir, s.owner, s.tableName, s.columns, typeToTs, meta, opts.force));
       tables++;
     } catch (e) {
       errors.push({ name, error: msg(e) });
@@ -54,7 +70,8 @@ export async function generateInterfaces(
     opts.onProgress?.(++done, total, name);
     try {
       const s = await db.describeView(v.viewName, v.owner);
-      files.push(await writeTableCache(cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(db), s.lastDdlTime));
+      const meta = { kind: "view" as const, lastDdlTime: s.lastDdlTime, comment: s.comment };
+      files.push(await writeTableCache(cacheDir, s.owner, s.viewName, s.columns, typeToTs, meta, opts.force));
       views++;
     } catch (e) {
       errors.push({ name, error: msg(e) });

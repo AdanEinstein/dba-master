@@ -9,7 +9,9 @@ export interface ViewRow { OWNER: string; VIEW_NAME: string }
 export interface ColumnRow {
   COLUMN_NAME: string; DATA_TYPE: string; NULLABLE: string; DATA_LENGTH: number;
   DATA_PRECISION: number | null; DATA_SCALE: number | null; DATA_DEFAULT: string | null;
+  COMMENTS: string | null;
 }
+export interface CheckRow { CONSTRAINT_NAME: string; SEARCH_CONDITION: string | null }
 export interface FkRow {
   CONSTRAINT_NAME: string; OWNER: string; TABLE_NAME: string; COLUMN_NAME: string;
   POSITION: number; R_OWNER: string; R_TABLE: string; R_COLUMN: string;
@@ -106,10 +108,33 @@ export class OracleQueries {
 
   findColumns(owner: string, table: string): Promise<ColumnRow[]> {
     return this.conn.query<ColumnRow>(
-      `SELECT column_name, data_type, nullable, data_length, data_precision, data_scale, data_default
-         FROM all_tab_columns
-        WHERE owner = :owner AND table_name = :tab
-        ORDER BY column_id`,
+      `SELECT c.column_name, c.data_type, c.nullable, c.data_length,
+              c.data_precision, c.data_scale, c.data_default, cc.comments
+         FROM all_tab_columns c
+         LEFT JOIN all_col_comments cc
+           ON cc.owner = c.owner AND cc.table_name = c.table_name AND cc.column_name = c.column_name
+        WHERE c.owner = :owner AND c.table_name = :tab
+        ORDER BY c.column_id`,
+      { owner, tab: table },
+    );
+  }
+
+  /** Comentário do objeto (COMMENT ON TABLE/VIEW) — cobre tabela e view. */
+  async findObjectComment(owner: string, name: string): Promise<string | null> {
+    const rows = await this.conn.query<{ COMMENTS: string | null }>(
+      `SELECT comments FROM all_tab_comments WHERE owner = :owner AND table_name = :n`,
+      { owner, n: name },
+    );
+    return rows[0]?.COMMENTS?.trim() ?? null;
+  }
+
+  /** Check constraints (type 'C'). O provider filtra os NOT NULL automáticos. */
+  findCheckConstraints(owner: string, table: string): Promise<CheckRow[]> {
+    return this.conn.query<CheckRow>(
+      `SELECT constraint_name, search_condition
+         FROM all_constraints
+        WHERE owner = :owner AND table_name = :tab AND constraint_type = 'C'
+        ORDER BY constraint_name`,
       { owner, tab: table },
     );
   }

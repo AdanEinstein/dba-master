@@ -15,9 +15,10 @@ export async function runGenerate(args: string[]): Promise<void> {
   const schema = flag("--schema");
   const connection = flag("--connection");
   const includeViews = !args.includes("--no-views");
+  const force = args.includes("--force");
 
   console.clear();
-  cfonts.say("DBA · TYPES", {
+  cfonts.say("DBA-MASTER · TYPES", {
     font: "block",
     align: "left",
     colors: ["#f80", "#f40"],
@@ -45,6 +46,7 @@ export async function runGenerate(args: string[]): Promise<void> {
     const r = await generateInterfaces(db, cfg.cacheDir, {
       schema,
       includeViews,
+      force,
       onProgress: (done, total, name) => s.message(`(${done}/${total}) ${name}`),
     });
 

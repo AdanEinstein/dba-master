@@ -25,7 +25,8 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
       try {
         const s = await db.describeView(view, schema);
         const cacheFile = await writeTableCache(
-          cfg.cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(provider), s.lastDdlTime,
+          cfg.cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(provider),
+          { kind: "view", lastDdlTime: s.lastDdlTime, comment: s.comment },
         );
         return jsonResult({ ...s, cacheFile });
       } catch (e) {
