@@ -2,4 +2,5 @@
 package-lock.json
 /dist/
 /.cache/
+/docs/superpowers/**
 .env
