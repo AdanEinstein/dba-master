@@ -135,5 +135,6 @@ export async function generateInterfaces(
     }
   });
 
+  files.sort();
   return { tables, views, files, errors };
 }

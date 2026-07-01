@@ -67,7 +67,7 @@ export function loadConfig(): Config {
   let defaultPoolMax = DEFAULT_POOL_MAX;
   if (process.env.DB_POOL_MAX) {
     const parsed = parseInt(process.env.DB_POOL_MAX, 10);
-    if (!Number.isNaN(parsed)) {
+    if (!Number.isNaN(parsed) && parsed > 0) {
       defaultPoolMax = parsed;
     }
   }
