@@ -1,0 +1,43 @@
+import type {
+  TableRef,
+  TableSchema,
+  Relationships,
+  DdlResult,
+  ProcedureRef,
+  PackageRef,
+  ScheduledJob,
+  RunSqlResult,
+} from "./types.js";
+
+// PORT (hexagonal): contrato que todo banco deve implementar. Tools e domínio
+// dependem só desta interface — nunca de um driver ou dialeto SQL concreto.
+
+/** Recursos opcionais que variam entre bancos (ex.: Postgres não tem packages). */
+export interface Capabilities {
+  packages: boolean;
+  scheduledJobs: boolean;
+}
+
+export interface DatabaseProvider {
+  /** Identificador do engine, ex.: "oracle". */
+  readonly engine: string;
+  /** O que este banco suporta. Tools consultam antes de expor um recurso. */
+  readonly capabilities: Capabilities;
+
+  /** Mapeia um tipo nativo do banco para o tipo TypeScript equivalente. */
+  typeToTs(dataType: string): string;
+
+  listTables(schema?: string): Promise<TableRef[]>;
+  searchTables(pattern: string, schema?: string): Promise<TableRef[]>;
+  /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */
+  describeTable(table: string, schema?: string): Promise<TableSchema>;
+  getRelationships(table: string, schema?: string): Promise<Relationships>;
+  getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult>;
+  listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]>;
+  listPackages(schema?: string, pattern?: string): Promise<PackageRef[]>;
+  listScheduledJobs(schema?: string, pattern?: string): Promise<ScheduledJob[]>;
+  /** Executa SQL cru, sem guarda de escrita (a política read-only fica na tool). */
+  runSql(sql: string, maxRows?: number): Promise<RunSqlResult>;
+
+  close(): Promise<void>;
+}

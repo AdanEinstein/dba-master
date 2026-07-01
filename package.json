@@ -1,0 +1,38 @@
+{
+  "name": "dba-master",
+  "version": "1.0.0",
+  "description": "MCP server para introspecção profunda de bancos Oracle, voltado a consumo por agentes de IA",
+  "type": "module",
+  "bin": {
+    "dba-master": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/domain/types.test.ts"
+  },
+  "keywords": [
+    "mcp",
+    "oracle",
+    "oracledb",
+    "dba",
+    "schema",
+    "introspection"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0-beta.1",
+    "dotenv": "^17.4.2",
+    "oracledb": "^7.0.0",
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/oracledb": "^7.0.1"
+  }
+}
