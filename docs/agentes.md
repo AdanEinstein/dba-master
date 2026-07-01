@@ -11,7 +11,7 @@ ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.
 ausentes viram placeholders `<VAR>` para editar depois.
 
 ```bash
-ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
   npx -y dba-master install-mcp                 # todos
   npx -y dba-master install-mcp --agent claude  # só um
 ```
@@ -24,8 +24,8 @@ No Claude Code, alternativamente via CLI:
 
 ```bash
 claude mcp add dba-master -s user \
-  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
-  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -e DB_USER=usuario -e DB_PASSWORD=senha \
+  -e DB_CONNECT_STRING=host:1521/service_name \
   -- npx -y dba-master
 ```
 
@@ -52,7 +52,7 @@ Ou sem o repo, via npm (credenciais no `env`, pois não há `.env` no pacote —
 [release.md](release.md)):
 
 ```jsonc
-{ "command": "npx", "args": ["-y", "dba-master"], "env": { "ORACLE_USER": "...", "ORACLE_PASSWORD": "...", "ORACLE_CONNECT_STRING": "host:1521/service_name" } }
+{ "command": "npx", "args": ["-y", "dba-master"], "env": { "DB_USER": "...", "DB_PASSWORD": "...", "DB_CONNECT_STRING": "host:1521/service_name" } }
 ```
 
 A chave do bloco varia por cliente (`mcpServers`, `servers`+`type:stdio`, `mcp`+`type:local`).

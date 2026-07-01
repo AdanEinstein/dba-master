@@ -2,7 +2,7 @@
 // Porta em Node do agents/install.sh, para funcionar quando o pacote é consumido via npx
 // (sem o repo). Lê o corpo do .md empacotado em agents/commands/ (ver "files" no package.json).
 // ponytail: fs cru + frontmatter por agente; sem engine de template. Fonte única do corpo.
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,44 +24,55 @@ const withFm = (dest: string) => write(dest, `---\ndescription: ${DESC}\n---\n\n
 const withSkill = (dest: string) =>
   write(dest, `---\nname: ${CMD}\ndescription: ${DESC}\n---\n\n${body()}`);
 
-const AGENTS: Record<string, () => void> = {
-  claude() {
-    const dest = join(homedir(), ".claude", "commands", `${CMD}.md`);
+const AGENTS: Record<string, (global: boolean) => void> = {
+  claude(global) {
+    const base = global ? homedir() : process.cwd();
+    const dest = join(base, ".claude", "commands", `${CMD}.md`);
     withFm(dest);
     console.log(`✓ Claude Code  → ${dest}`);
   },
-  copilot() {
-    const dest = join(homedir(), ".copilot", "skills", CMD, "SKILL.md");
+  copilot(global) {
+    const base = global ? homedir() : process.cwd();
+    const dest = join(base, ".copilot", "skills", CMD, "SKILL.md");
     withSkill(dest);
     console.log(`✓ Copilot      → ${dest}  (skill pessoal, não slash command)`);
   },
-  opencode() {
-    const dest = join(homedir(), ".config", "opencode", "command", `${CMD}.md`);
+  opencode(global) {
+    const dest = global 
+      ? join(homedir(), ".config", "opencode", "command", `${CMD}.md`)
+      : join(process.cwd(), ".opencode", "command", `${CMD}.md`);
     withFm(dest);
     console.log(`✓ Opencode     → ${dest}`);
   },
-  antigravity() {
-    // workflows; path global não-documentado → best-effort em ~/.gemini/workflows
-    const gemini = join(homedir(), ".gemini");
-    if (existsSync(gemini)) {
-      const dest = join(gemini, "workflows", `${CMD}.md`);
-      write(dest, `# ${CMD}\n\n${DESC}\n\n${body()}`);
-      console.log(`✓ Antigravity  → ${dest}  (⚠️ path global não-doc; ou crie via UI Customizations→Workflows)`);
+  antigravity(global) {
+    if (global) {
+      const destGlobal = join(homedir(), ".gemini", "antigravity-cli", "skills", CMD, "SKILL.md");
+      const destShared = join(homedir(), ".gemini", "skills", CMD, "SKILL.md");
+
+      withSkill(destGlobal);
+      console.log(`✓ Antigravity (Global)    → ${destGlobal}`);
+
+      withSkill(destShared);
+      console.log(`✓ Antigravity (Shared)    → ${destShared}`);
     } else {
-      console.log(`↷ Antigravity  → ~/.gemini ausente. Crie o workflow via UI (Customizations→Workflows) com o conteúdo de ${CMD}.md.`);
+      const destWorkspace = join(process.cwd(), ".agents", "skills", CMD, "SKILL.md");
+      withSkill(destWorkspace);
+      console.log(`✓ Antigravity (Workspace) → ${destWorkspace}`);
     }
   },
 };
 
 export function installAgents(argv: string[]): void {
-  // aceita "--agent claude" ou só "claude"; sem nada = todos
-  const only = argv[0] === "--agent" ? argv[1] : argv[0];
+  // aceita "--agent claude" ou só "claude"; aceita "-g" para escopo global
+  const isGlobal = argv.includes("-g");
+  const filtered = argv.filter((a) => a !== "-g");
+  const only = filtered[0] === "--agent" ? filtered[1] : filtered[0];
   const targets = only ? [only] : Object.keys(AGENTS);
   const unknown = targets.filter((t) => !AGENTS[t]);
   if (unknown.length) {
     console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(AGENTS).join(", ")}.`);
     process.exit(1);
   }
-  for (const t of targets) AGENTS[t]();
-  console.log("Pronto. Reabra/recarregue o agente para ele reindexar o comando.");
+  for (const t of targets) AGENTS[t](isGlobal);
+  console.log(`Pronto. Reabra/recarregue o agente para ele reindexar o comando (${isGlobal ? "global" : "project scoped"}).`);
 }

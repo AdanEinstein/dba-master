@@ -13,18 +13,23 @@ const COMMAND = "npx";
 const ARGS = ["-y", "dba-master"];
 
 // Credenciais para o bloco env. Obrigatórias viram placeholder se ausentes no ambiente.
-const REQUIRED = ["ORACLE_USER", "ORACLE_PASSWORD", "ORACLE_CONNECT_STRING"];
-const OPTIONAL = ["DB_ENGINE", "ORACLE_CLIENT_MODE", "SCHEMA_FILTER", "READ_ONLY"];
+const REQUIRED = ["DB_USER", "DB_PASSWORD", "DB_CONNECT_STRING"];
+const OPTIONAL = ["DB_ENGINE", "DB_CLIENT_MODE", "SCHEMA_FILTER", "READ_ONLY"];
 let usedPlaceholder = false;
 
 function envBlock(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const k of REQUIRED) {
-    const v = process.env[k];
+    const fallback = k.replace("DB_", "ORACLE_");
+    const v = process.env[k] || process.env[fallback];
     if (v) env[k] = v;
     else { env[k] = `<${k}>`; usedPlaceholder = true; }
   }
-  for (const k of OPTIONAL) if (process.env[k]) env[k] = process.env[k] as string;
+  for (const k of OPTIONAL) {
+    const fallback = k.replace("DB_", "ORACLE_");
+    const v = process.env[k] || process.env[fallback];
+    if (v) env[k] = v;
+  }
   return env;
 }
 
@@ -46,38 +51,51 @@ function updateJson(file: string, mutate: (data: Record<string, unknown>) => voi
 const bag = (data: Record<string, unknown>, key: string) =>
   (data[key] ??= {}) as Record<string, unknown>;
 
-const AGENTS: Record<string, () => void> = {
-  claude() {
-    // Claude Desktop
-    const desktop = join(homedir(), ".claude", "claude_desktop_config.json");
-    updateJson(desktop, (d) => {
-      bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
-    });
-    console.log(`✓ Claude Desktop  → ${desktop}`);
-    // Claude Code (user scope): ~/.claude.json, mcpServers na raiz
-    const cli = join(homedir(), ".claude.json");
-    updateJson(cli, (d) => {
-      bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
-    });
-    console.log(`✓ Claude Code     → ${cli}`);
+const AGENTS: Record<string, (global: boolean) => void> = {
+  claude(global) {
+    if (global) {
+      // Claude Desktop
+      const desktop = join(homedir(), ".claude", "claude_desktop_config.json");
+      updateJson(desktop, (d) => {
+        bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
+      });
+      console.log(`✓ Claude Desktop  → ${desktop}`);
+      // Claude Code (user scope): ~/.claude.json, mcpServers na raiz
+      const cli = join(homedir(), ".claude.json");
+      updateJson(cli, (d) => {
+        bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
+      });
+      console.log(`✓ Claude Code     → ${cli}`);
+    } else {
+      const cli = join(process.cwd(), ".claude.json");
+      updateJson(cli, (d) => {
+        bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
+      });
+      console.log(`✓ Claude Code     → ${cli}`);
+    }
   },
-  copilot() {
-    const f = join(homedir(), ".copilot", "mcp-config.json");
+  copilot(global) {
+    const base = global ? homedir() : process.cwd();
+    const f = join(base, ".copilot", "mcp-config.json");
     updateJson(f, (d) => {
       bag(d, "mcpServers")[KEY] = { type: "local", command: COMMAND, args: ARGS, tools: ["*"], env: envBlock() };
     });
     console.log(`✓ Copilot CLI     → ${f}`);
   },
-  opencode() {
-    const f = join(homedir(), ".config", "opencode", "opencode.json");
+  opencode(global) {
+    const f = global 
+      ? join(homedir(), ".config", "opencode", "opencode.json")
+      : join(process.cwd(), ".opencode", "opencode.json");
     updateJson(f, (d) => {
       d["$schema"] ??= "https://opencode.ai/config.json";
       bag(d, "mcp")[KEY] = { type: "local", command: [COMMAND, ...ARGS], enabled: true, environment: envBlock() };
     });
     console.log(`✓ Opencode        → ${f}`);
   },
-  antigravity() {
-    const f = join(homedir(), ".gemini", "config", "mcp_config.json");
+  antigravity(global) {
+    const f = global 
+      ? join(homedir(), ".gemini", "config", "mcp_config.json")
+      : join(process.cwd(), ".agents", "mcp_config.json");
     updateJson(f, (d) => {
       bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS, env: envBlock() };
     });
@@ -86,21 +104,23 @@ const AGENTS: Record<string, () => void> = {
 };
 
 export function installMcp(argv: string[]): void {
-  const only = argv[0] === "--agent" ? argv[1] : argv[0];
+  const isGlobal = argv.includes("-g");
+  const filtered = argv.filter((a) => a !== "-g");
+  const only = filtered[0] === "--agent" ? filtered[1] : filtered[0];
   const targets = only ? [only] : Object.keys(AGENTS);
   const unknown = targets.filter((t) => !AGENTS[t]);
   if (unknown.length) {
     console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(AGENTS).join(", ")}.`);
     process.exit(1);
   }
-  for (const t of targets) AGENTS[t]();
+  for (const t of targets) AGENTS[t](isGlobal);
   if (usedPlaceholder) {
     console.log(
-      `\n⚠️  Credenciais não estavam no ambiente — gravei placeholders <ORACLE_USER>/<ORACLE_PASSWORD>/<ORACLE_CONNECT_STRING>.`,
+      `\n⚠️  Credenciais não estavam no ambiente — gravei placeholders <DB_USER>/<DB_PASSWORD>/<DB_CONNECT_STRING>.`,
     );
     console.log(
-      `   Edite os configs, ou reinstale com as vars setadas:\n   ORACLE_USER=... ORACLE_PASSWORD=... ORACLE_CONNECT_STRING=host:1521/service npx -y dba-master install-mcp`,
+      `   Edite os configs, ou reinstale com as vars setadas:\n   DB_USER=... DB_PASSWORD=... DB_CONNECT_STRING=host:1521/service npx -y dba-master install-mcp ${isGlobal ? "-g " : ""}`,
     );
   }
-  console.log("\nServer MCP 'dba-master' registrado. Reinicie o agente para carregar.");
+  console.log(`\nServer MCP 'dba-master' registrado (${isGlobal ? "global" : "project scoped"}). Reinicie o agente para carregar.`);
 }

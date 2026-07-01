@@ -22,20 +22,22 @@ export interface Config {
   cacheDir: string;
 }
 
-function req(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Variável de ambiente obrigatória ausente: ${name}`);
-  return v;
+function req(names: string[]): string {
+  for (const name of names) {
+    const v = process.env[name];
+    if (v) return v;
+  }
+  throw new Error(`Variável de ambiente obrigatória ausente: ${names[0]}`);
 }
 
 export function loadConfig(): Config {
   return {
     engine: (process.env.DB_ENGINE || "oracle").toLowerCase(),
-    user: req("ORACLE_USER"),
-    password: req("ORACLE_PASSWORD"),
-    connectString: req("ORACLE_CONNECT_STRING"),
-    thick: process.env.ORACLE_CLIENT_MODE?.toLowerCase() === "thick",
-    clientLibDir: process.env.ORACLE_CLIENT_LIB_DIR || undefined,
+    user: req(["DB_USER", "ORACLE_USER"]),
+    password: req(["DB_PASSWORD", "ORACLE_PASSWORD"]),
+    connectString: req(["DB_CONNECT_STRING", "ORACLE_CONNECT_STRING"]),
+    thick: (process.env.DB_CLIENT_MODE || process.env.ORACLE_CLIENT_MODE)?.toLowerCase() === "thick",
+    clientLibDir: process.env.DB_CLIENT_LIB_DIR || process.env.ORACLE_CLIENT_LIB_DIR || undefined,
     schemaFilter: (process.env.SCHEMA_FILTER || "")
       .split(",")
       .map((s) => s.trim().toUpperCase())

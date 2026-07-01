@@ -2,7 +2,7 @@
 
 Instala o **dba-master** num agente de IA, em duas vias independentes (combináveis):
 
-1. **Servidor MCP** — expõe a introspecção Oracle como _tools_ MCP (as 9 tools).
+1. **Servidor MCP** — expõe a introspecção de banco de dados como _tools_ MCP (as 9 tools).
 2. **Skill/comando `dba-investigate`** — um workflow que ensina o agente a usar as tools
    para investigar o schema e propor soluções.
 
@@ -17,7 +17,7 @@ bloco `env` de cada config (o pacote npx não tem `.env` ao lado); se ausentes, 
 placeholders `<VAR>` para editar depois.
 
 ```bash
-ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
   npx -y dba-master install-mcp                 # todos os agentes
   npx -y dba-master install-mcp --agent claude  # só um
 ```
@@ -35,8 +35,8 @@ Destinos do config (só globais, no `~`):
 **Claude Code** — alternativa via CLI:
 ```bash
 claude mcp add dba-master -s user \
-  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
-  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -e DB_USER=usuario -e DB_PASSWORD=senha \
+  -e DB_CONNECT_STRING=host:1521/service_name \
   -- npx -y dba-master
 ```
 
@@ -45,7 +45,7 @@ claude mcp add dba-master -s user \
 Transporte STDIO padrão. Cole no config MCP do agente (credenciais no `env`):
 
 ```jsonc
-{ "command": "npx", "args": ["-y", "dba-master"], "env": { "ORACLE_USER": "...", "ORACLE_PASSWORD": "...", "ORACLE_CONNECT_STRING": "host:1521/service_name" } }
+{ "command": "npx", "args": ["-y", "dba-master"], "env": { "DB_USER": "...", "DB_PASSWORD": "...", "DB_CONNECT_STRING": "host:1521/service_name" } }
 ```
 
 Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli),

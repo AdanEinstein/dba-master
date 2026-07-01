@@ -10,19 +10,19 @@ de cada agente e grava as credenciais no bloco `env` (o pacote npx **não tem `.
 — a config vem do ambiente):
 
 ```bash
-ORACLE_USER=usuario ORACLE_PASSWORD=senha ORACLE_CONNECT_STRING=host:1521/service_name \
+DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
   npx -y dba-master install-mcp                 # todos os agentes
   npx -y dba-master install-mcp --agent claude  # só um
 ```
 
-Sem as vars no ambiente, grava placeholders `<ORACLE_USER>` etc. para editar depois.
+Sem as vars no ambiente, grava placeholders `<DB_USER>` etc. para editar depois.
 
 No Claude Code, alternativamente via CLI:
 
 ```bash
 claude mcp add dba-master \
-  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
-  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -e DB_USER=usuario -e DB_PASSWORD=senha \
+  -e DB_CONNECT_STRING=host:1521/service_name \
   -- npx -y dba-master
 ```
 
@@ -33,9 +33,9 @@ Ou config manual em qualquer cliente MCP:
   "command": "npx",
   "args": ["-y", "dba-master"],
   "env": {
-    "ORACLE_USER": "usuario",
-    "ORACLE_PASSWORD": "senha",
-    "ORACLE_CONNECT_STRING": "host:1521/service_name"
+    "DB_USER": "usuario",
+    "DB_PASSWORD": "senha",
+    "DB_CONNECT_STRING": "host:1521/service_name"
   }
 }
 ```

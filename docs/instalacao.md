@@ -10,8 +10,8 @@ Ver [release.md](release.md) para o snippet completo.
 
 ```bash
 claude mcp add dba-master \
-  -e ORACLE_USER=usuario -e ORACLE_PASSWORD=senha \
-  -e ORACLE_CONNECT_STRING=host:1521/service_name \
+  -e DB_USER=usuario -e DB_PASSWORD=senha \
+  -e DB_CONNECT_STRING=host:1521/service_name \
   -- npx -y dba-master
 ```
 
@@ -23,18 +23,18 @@ cp .env.example .env   # edite com suas credenciais
 npm run build          # compila para dist/
 ```
 
-Modo **thin** (default) é JS puro e não exige Oracle Instant Client. Só use
-`ORACLE_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
+Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só use
+`DB_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
 
 ## Variáveis de ambiente
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `ORACLE_USER` / `ORACLE_PASSWORD` | sim | Credenciais |
-| `ORACLE_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
+| `DB_USER` / `DB_PASSWORD` | sim | Credenciais |
+| `DB_CONNECT_STRING` | sim | Ex.: `host:1521/service_name` |
 | `DB_ENGINE` | não | Engine de banco (default `oracle`) |
-| `ORACLE_CLIENT_MODE` | não | `thin` (default) ou `thick` |
-| `ORACLE_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
+| `DB_CLIENT_MODE` | não | `thin` (default) ou `thick` |
+| `DB_CLIENT_LIB_DIR` | não | Libs do client (só thick, caminho não-padrão) |
 | `SCHEMA_FILTER` | não | Lista de schemas separada por vírgula; vazio = todos os acessíveis |
 | `READ_ONLY` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
 | `CACHE_DIR` | não | Diretório das interfaces `.ts` (default: `./.cache`) |
