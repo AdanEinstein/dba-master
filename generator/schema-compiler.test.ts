@@ -40,23 +40,23 @@ const stub = {
 const dir = mkdtempSync(join(tmpdir(), "dba-compile-"));
 
 // tabelas + views por padrão
-const r = await generateInterfaces(stub, dir);
+const r = await generateInterfaces(stub, dir, "test_conn");
 assert.equal(r.tables, 2);
 assert.equal(r.views, 1);
 assert.equal(r.errors.length, 0);
-assert.ok(existsSync(join(dir, "HR", "EMPLOYEES.ts")));
-assert.ok(existsSync(join(dir, "HR", "EMP_VIEW.ts")));
-const empSrc = readFileSync(join(dir, "HR", "EMPLOYEES.ts"), "utf8");
+assert.ok(existsSync(join(dir, "test_conn", "HR", "EMPLOYEES.ts")));
+assert.ok(existsSync(join(dir, "test_conn", "HR", "EMP_VIEW.ts")));
+const empSrc = readFileSync(join(dir, "test_conn", "HR", "EMPLOYEES.ts"), "utf8");
 assert.match(empSrc, /export interface Employees {/);
 assert.match(empSrc, /\/\/ hash: /);
 assert.match(empSrc, /FK → HR\.DEPARTMENTS/);
-assert.match(readFileSync(join(dir, "HR", "EMP_VIEW.ts"), "utf8"), /\/\/ kind: view/);
+assert.match(readFileSync(join(dir, "test_conn", "HR", "EMP_VIEW.ts"), "utf8"), /\/\/ kind: view/);
 
 // includeViews:false pula views
 const dir2 = mkdtempSync(join(tmpdir(), "dba-compile-"));
-const r2 = await generateInterfaces(stub, dir2, { includeViews: false });
+const r2 = await generateInterfaces(stub, dir2, "test_conn", { includeViews: false });
 assert.equal(r2.tables, 2);
 assert.equal(r2.views, 0);
-assert.ok(!existsSync(join(dir2, "HR", "EMP_VIEW.ts")));
+assert.ok(!existsSync(join(dir2, "test_conn", "HR", "EMP_VIEW.ts")));
 
 console.log("ok — schema-compiler.test.ts passou");

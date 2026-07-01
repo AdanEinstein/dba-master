@@ -41,6 +41,7 @@ async function mapPool<T>(items: T[], limit: number, fn: (t: T) => Promise<void>
 export async function generateInterfaces(
   db: DatabaseProvider,
   cacheDir: string,
+  connectionName: string,
   opts: GenerateOptions = {},
 ): Promise<GenerateResult> {
   const files: string[] = [];
@@ -59,7 +60,6 @@ export async function generateInterfaces(
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {
     const name = `${t.owner}.${t.tableName}`;
-    const file = join(cacheDir, t.owner, `${t.tableName}.ts`);
 
 
     try {
@@ -76,7 +76,7 @@ export async function generateInterfaces(
         checkConstraints: s.checkConstraints,
         indexes: s.indexes,
       };
-      files.push(await writeTableCache(cacheDir, s.owner, s.tableName, s.columns, typeToTs, meta, opts.force));
+      files.push(await writeTableCache(cacheDir, connectionName, s.owner, s.tableName, s.columns, typeToTs, meta, opts.force));
       tables++;
     } catch (e) {
       errors.push({ name, error: msg(e) });
@@ -88,13 +88,12 @@ export async function generateInterfaces(
   let views = 0;
   await mapPool(viewRefs, poolMax, async (v) => {
     const name = `${v.owner}.${v.viewName}`;
-    const file = join(cacheDir, v.owner, `${v.viewName}.ts`);
 
 
     try {
       const s = await db.describeView(v.viewName, v.owner);
       const meta = { kind: "view" as const, lastDdlTime: s.lastDdlTime, comment: s.comment };
-      files.push(await writeTableCache(cacheDir, s.owner, s.viewName, s.columns, typeToTs, meta, opts.force));
+      files.push(await writeTableCache(cacheDir, connectionName, s.owner, s.viewName, s.columns, typeToTs, meta, opts.force));
       views++;
     } catch (e) {
       errors.push({ name, error: msg(e) });

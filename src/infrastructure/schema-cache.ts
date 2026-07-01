@@ -11,7 +11,7 @@ export function readCachedHash(content: string): string | undefined {
 }
 
 /**
- * Grava a interface .ts da tabela/view em cacheDir/<OWNER>/<OBJ>.ts.
+ * Grava a interface .ts da tabela/view em cacheDir/<connectionName>/<OWNER>/<OBJ>.ts.
  * Se o hash do header bater com o atual, pula a regeneração (a menos de `force`).
  * O mapeamento de tipos vem do provider (DB-específico); `meta` traz kind/relacionamentos.
  *
@@ -21,6 +21,7 @@ export function readCachedHash(content: string): string | undefined {
  */
 export async function writeTableCache(
   cacheDir: string,
+  connectionName: string,
   owner: string,
   table: string,
   columns: ColumnInfo[],
@@ -28,7 +29,7 @@ export async function writeTableCache(
   meta: InterfaceMeta,
   force = false,
 ): Promise<string> {
-  const dir = join(cacheDir, owner);
+  const dir = join(cacheDir, connectionName, owner);
   const file = join(dir, `${table}.ts`);
 
   const content = generateInterface(owner, table, columns, typeToTs, meta);

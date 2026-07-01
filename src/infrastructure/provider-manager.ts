@@ -22,20 +22,21 @@ export class ProviderManager {
   }
 
   public getProvider(name?: string): DatabaseProvider {
+    return this.providers.get(this.resolveConnectionName(name))!;
+  }
+
+  public resolveConnectionName(name?: string): string {
     if (!name) {
-      // Se não passou nome e só tem uma conexão, usa ela.
       if (this.providers.size === 1) {
-        return Array.from(this.providers.values())[0];
+        return Array.from(this.providers.keys())[0];
       }
       throw new Error("Múltiplas conexões disponíveis. Você deve especificar qual utilizar (connectionName).");
     }
-
-    const provider = this.providers.get(name);
-    if (!provider) {
+    if (!this.providers.has(name)) {
       const names = Array.from(this.providers.keys()).join(", ");
       throw new Error(`Conexão '${name}' não encontrada. Disponíveis: ${names}`);
     }
-    return provider;
+    return name;
   }
 
   public getAvailableConnections(): string[] {

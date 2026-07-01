@@ -18,7 +18,7 @@ export async function runGenerate(args: string[]): Promise<void> {
   const force = args.includes("--force");
 
   console.clear();
-  cfonts.say("DBA-MASTER · GEN", {
+  cfonts.say("DBA-MASTER", {
     font: "block",
     align: "left",
     colors: ["#f80", "#f40"],
@@ -41,9 +41,10 @@ export async function runGenerate(args: string[]): Promise<void> {
 
   try {
     const db = mgr.getProvider(connection);
+    const resolvedName = mgr.resolveConnectionName(connection);
     s.start("Lendo schema...");
 
-    const r = await generateInterfaces(db, cfg.cacheDir, {
+    const r = await generateInterfaces(db, cfg.cacheDir, resolvedName, {
       schema,
       includeViews,
       force,

@@ -49,11 +49,11 @@ Nada muda em `domain/`, `mcp/tools/*` nem `index.ts`.
 
 ## Cache incremental de tipos
 
-`describe_table`/`describe_view` geram `CACHE_DIR/<OWNER>/<NOME>.ts` com uma `interface`
+`describe_table`/`describe_view` geram `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface`
 (default de `CACHE_DIR`: `.dba-master/types`, ao lado do `connections.json`). O mapeamento de
 tipos vem do provider (`typeToTs` — específico do banco), então o cache é DB-agnóstico.
-O header do arquivo grava o `LAST_DDL_TIME`; na próxima chamada, se bater, a geração é
-pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis em código.
+
+O header do arquivo grava o `hash` criptográfico (SHA-256) do conteúdo; na próxima chamada, o hash do novo conteúdo gerado é comparado e se bater, a reescrita no sistema de arquivos é pulada. Isso dá ao agente tanto um cache navegável quanto tipos utilizáveis em código.
 
 Para compilar o schema inteiro de uma vez, `schema-compiler.ts` (`generateInterfaces`) compõe
 `describe*` + `writeTableCache` num laço sobre `listTables`/`listViews`. Exposto de dois modos,

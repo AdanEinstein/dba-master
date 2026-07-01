@@ -21,11 +21,12 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     },
     async ({ connectionName, view, schema }) => {
       const db = provider.getProvider(connectionName);
+      const resolvedName = provider.resolveConnectionName(connectionName);
 
       try {
         const s = await db.describeView(view, schema);
         const cacheFile = await writeTableCache(
-          cfg.cacheDir, s.owner, s.viewName, s.columns, db.typeToTs.bind(provider),
+          cfg.cacheDir, resolvedName, s.owner, s.viewName, s.columns, db.typeToTs.bind(provider),
           { kind: "view", lastDdlTime: s.lastDdlTime, comment: s.comment },
         );
         return jsonResult({ ...s, cacheFile });

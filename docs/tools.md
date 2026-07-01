@@ -39,17 +39,14 @@ Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ## Cache de tipos
 
-Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<OWNER>/<NOME>.ts` com uma
+Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma
 `interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O header marca
-`// kind: table`/`// kind: view` e um bloco JSDoc traz comentário do objeto, PK, índices
-`UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e o
-comentário de cada coluna — pensado como base de conhecimento para o agente. A regeneração é
-**incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só
-reescreve se o objeto mudou. A resposta inclui `cacheFile` com o caminho gerado.
+`// kind: table`/`// kind: view` e também guarda um `hash` de integridade. Em bloco JSDoc, ele traz o 
+comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos e o comentário de cada coluna. A regeneração é
+**incremental**: o builder valida o hash criptográfico do conteúdo novo e só reescreve no disco
+se houver mudança. A resposta inclui `cacheFile` com o caminho gerado.
 
-Passe `force: true` (ou `--force` no CLI) para ignorar o cache e reescrever tudo — necessário
-na primeira execução após atualizar o dba-master, e para reconciliar a seção
-`referenciada por ←` (uma FK criada em outra tabela não altera o `LAST_DDL_TIME` desta).
+Passe `force: true` (ou `--force` no CLI) para ignorar o cache e reescrever tudo (já não é mais estritamente necessário para sincronizar FKs de entrada, pois o hash já captura essa alteração).
 
 Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou
 `npx dba-master generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em

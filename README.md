@@ -157,14 +157,14 @@ npx -y dba-master@latestgenerate --connection prod   # conexão nomeada
 npx -y dba-master@latestgenerate --force         # ignora o cache e reescreve tudo
 ```
 
-Incremental (pula objetos com `LAST_DDL_TIME` inalterado). Também disponível como tool MCP
+Incremental (valida por hash do conteúdo para pular reescrita). Também disponível como tool MCP
 `generate_interfaces` para o agente chamar sob demanda.
 
 Cada `.ts` gerado é uma **base de conhecimento**: marca `// kind: table` ou `// kind: view`
 e, em bloco JSDoc, traz o comentário do objeto, PK, índices `UNIQUE`, `CHECK`, os
 relacionamentos (`FK →` de saída e `referenciada por ←` de entrada) e o comentário de cada
 coluna. Use `--force` na primeira execução após atualizar o dba-master para reescrever os
-arquivos antigos (o cache pula objetos com `LAST_DDL_TIME` inalterado).
+arquivos antigos (o cache pula objetos inalterados via validação de hash).
 
 ### Verificação
 
@@ -215,6 +215,4 @@ Com `READ_ONLY=true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (I
 
 ### Cache de tipos
 
-Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<OWNER>/<NOME>.ts` com uma `interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O arquivo marca `// kind: table`/`// kind: view` e, em bloco JSDoc, traz comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e comentário de cada coluna. A regeneração é **incremental**: compara o `LAST_DDL_TIME` gravado no header do arquivo com o do banco e só reescreve se o objeto mudou. A resposta inclui `cacheFile` com o caminho gerado. Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou `npx dba-master generate` (CLI).
-
-> **Ressalva do cache incremental:** criar uma FK em *outra* tabela apontando para esta não altera o `LAST_DDL_TIME` daqui, então a seção `referenciada por ←` pode ficar desatualizada. Rode com `force` (`--force` no CLI) para reconciliar.
+Em cada `describe_table`/`describe_view`, o objeto vira `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma `interface` TypeScript (default de `CACHE_DIR`: `.dba-master/types`). O arquivo marca `// kind: table`/`// kind: view` e, em bloco JSDoc, traz comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos (`FK →` de saída, `referenciada por ←` de entrada) e comentário de cada coluna. A regeneração é **incremental**: o builder valida o hash (SHA-256) do conteúdo gerado contra o header do arquivo e só o reescreve se o hash mudar (o que soluciona corretamente o problema de invalidação para alterações nas dependências da tabela). A resposta inclui `cacheFile` com o caminho gerado. Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou `npx dba-master generate` (CLI).

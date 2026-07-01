@@ -69,19 +69,19 @@ Claude Desktop, em `claude_desktop_config.json`:
 
 ## Gerar interfaces do schema
 
-Compila em lote as `interface` TypeScript de todas as tabelas (e views) para `CACHE_DIR`
+Compila em lote as `interface` TypeScript de todas as tabelas (e views) para `CACHE_DIR/<NOME_DA_CONEXAO>/<OWNER>`
 (default `.dba-master/types`). Mesmo estilo do `install` — roda via `npx`, sem clonar:
 
 ```bash
-npx -y dba-master@latestgenerate                 # todas as tabelas + views dos schemas acessíveis
-npx -y dba-master@latestgenerate --schema HR     # só o schema HR
-npx -y dba-master@latestgenerate --no-views      # pula views
-npx -y dba-master@latestgenerate --connection prod   # escolhe a conexão nomeada
+npx -y dba-master@latest generate                 # todas as tabelas + views dos schemas acessíveis
+npx -y dba-master@latest generate --schema HR     # só o schema HR
+npx -y dba-master@latest generate --no-views      # pula views
+npx -y dba-master@latest generate --connection prod   # escolhe a conexão nomeada
 ```
 
 Usa as credenciais do `connections.json` (gravado pelo `install`) ou do `.env`. É
-**incremental**: objetos com `LAST_DDL_TIME` inalterado não são reescritos. Também disponível
-como tool MCP `generate_interfaces` para o agente chamar sob demanda.
+**incremental**: objetos em que o hash do conteúdo gerado for inalterado não são reescritos no sistema de arquivos. Também disponível
+via tool MCP `generate_interfaces` para o agente chamar sob demanda.
 
 ## Verificação
 

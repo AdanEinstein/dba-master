@@ -19,11 +19,12 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     },
     async ({ connectionName, table, schema }) => {
       const db = provider.getProvider(connectionName);
+      const resolvedName = provider.resolveConnectionName(connectionName);
 
       try {
         const s = await db.describeTable(table, schema);
         const cacheFile = await writeTableCache(
-          cfg.cacheDir, s.owner, s.tableName, s.columns, db.typeToTs.bind(provider),
+          cfg.cacheDir, resolvedName, s.owner, s.tableName, s.columns, db.typeToTs.bind(provider),
           { kind: "table", lastDdlTime: s.lastDdlTime, comment: s.comment, primaryKey: s.primaryKey,
             foreignKeys: s.foreignKeys, checkConstraints: s.checkConstraints, indexes: s.indexes },
         );
