@@ -19,7 +19,7 @@ npx -y dba-master@latest install
 ```
 
 Siga as instruções na tela para:
-1. Configurar suas conexões de banco de dados (as credenciais serão salvas no arquivo `connections.json`).
+1. Configurar, usar, editar ou gerenciar (excluir) conexões de banco de dados (salvas em `connections.json`).
 2. Escolher o escopo da instalação: **Global** (para todos os projetos) ou **Project scoped** (apenas para o projeto atual).
 3. Selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity).
 

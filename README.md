@@ -36,8 +36,8 @@ para investigar o schema e propor soluções (queries, modelagem, diagnósticos)
 ◇  String de conexão (ex: localhost:1521/ORCL):
 │  localhost:1521/FREEPDB1
 │
-◇  O arquivo connections.json já possui conexões configuradas. O que deseja fazer?
-│  Sobrescrever o arquivo inteiro apagando outras conexões
+◇  Conexões existentes encontradas. O que deseja fazer?
+│  Criar uma nova conexão
 │
 ◆  Conexão salva em /home/.../dba-master/.dba-master/connections.json
 ```
@@ -55,7 +55,7 @@ npx -y dba-master@latest install
 ```
 
 O comando abrirá uma interface interativa onde você poderá:
-- Configurar uma ou mais conexões com bancos de dados.
+- Criar, editar, excluir ou usar conexões com bancos de dados.
 - Selecionar se deseja instalação com **escopo de projeto** (na pasta atual) ou **global** (na home).
 - Selecionar quais agentes de IA deseja configurar (Claude, Copilot, Opencode, Antigravity).
 
@@ -65,6 +65,12 @@ Para desinstalar e limpar os agentes configurados, basta executar:
 
 ```bash
 npx -y dba-master@latest uninstall
+```
+
+Para gerenciar as conexões existentes de forma isolada (criar, editar ou excluir credenciais sem instalar os agentes novamente), use:
+
+```bash
+npx -y dba-master@latest configure
 ```
 
 No Claude Code, alternativamente via CLI (apenas configuração do server MCP, exigirá variáveis de ambiente de fallback):

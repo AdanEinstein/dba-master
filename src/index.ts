@@ -27,6 +27,12 @@ if (process.argv[2] === "uninstall") {
   process.exit(0);
 }
 
+if (process.argv[2] === "configure") {
+  const { runConfigure } = await import("../setup/index.js");
+  await runConfigure();
+  process.exit(0);
+}
+
 if (process.argv[2] === "generate") {
   const { runGenerate } = await import("../generator/index.js");
   await runGenerate(process.argv.slice(3));
