@@ -22,8 +22,9 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     },
     async ({ connectionName, schema, includeViews, force }) => {
       const db = provider.getProvider(connectionName);
+      const poolMax = cfg.connections[connectionName]?.poolMax;
       try {
-        const r = await generateInterfaces(db, cfg.cacheDir, { schema, includeViews, force });
+        const r = await generateInterfaces(db, cfg.cacheDir, { schema, includeViews, force, poolMax });
         return jsonResult({
           tables: r.tables,
           views: r.views,

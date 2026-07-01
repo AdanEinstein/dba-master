@@ -12,6 +12,7 @@ export interface ConnectionConfig {
   connectString: string;
   thick?: boolean;
   clientLibDir?: string;
+  poolMax?: number;
 }
 
 export interface Config {
@@ -58,6 +59,13 @@ export function loadConfig(): Config {
         thick: process.env.DB_CLIENT_MODE?.toLowerCase() === "thick",
         clientLibDir: process.env.DB_CLIENT_LIB_DIR,
       };
+    }
+  }
+
+  const defaultPoolMax = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 8;
+  for (const key of Object.keys(connections)) {
+    if (connections[key].poolMax === undefined) {
+      connections[key].poolMax = defaultPoolMax;
     }
   }
 

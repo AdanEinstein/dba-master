@@ -9,6 +9,8 @@ export interface GenerateOptions {
   includeViews?: boolean; // default: true
   /** Ignora o cache incremental e reescreve todos os arquivos. */
   force?: boolean;
+  /** Concorrência máxima permitida (default: 8) */
+  poolMax?: number;
   /** Callback de progresso (para spinner/animação). Chamado a cada objeto processado. */
   onProgress?: (done: number, total: number, name: string) => void;
 }
@@ -47,7 +49,7 @@ export async function generateInterfaces(
   let done = 0;
 
   const typeToTs = db.typeToTs.bind(db);
-  const poolMax = 4; // Limite de concorrência
+  const poolMax = opts.poolMax ?? 8; // Limite de concorrência
 
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {

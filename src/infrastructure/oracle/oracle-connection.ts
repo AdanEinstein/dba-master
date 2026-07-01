@@ -23,7 +23,7 @@ export class OracleConnection {
       password: this.cfg.password,
       connectString: this.cfg.connectString,
       poolMin: 0,
-      poolMax: 4,
+      poolMax: this.cfg.poolMax ?? 8,
     });
     return this.pool;
   }
