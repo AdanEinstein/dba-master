@@ -4,40 +4,27 @@ Duas vias combináveis, ambas subcomandos da própria bin (via `npx`, sem o repo
 `claude` · `copilot` · `opencode` · `antigravity`. Detalhes completos em
 [../agents/INSTALL.md](../agents/INSTALL.md).
 
-## Servidor MCP
+## Instalador Unificado (Interativo)
 
-Registra o server (`npx -y dba-master`) no config de cada agente. As credenciais vêm do
-ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.env` ao lado);
-ausentes viram placeholders `<VAR>` para editar depois.
+Registra o server e a skill (`npx -y dba-master install`) na configuração dos agentes escolhidos em um único fluxo iterativo. As credenciais vêm do ambiente e são gravadas no bloco `env` de cada config (o pacote npx não tem `.env` ao lado); ausentes viram placeholders `<VAR>` para editar depois.
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install-mcp                 # todos
-  npx -y dba-master install-mcp --agent claude  # só um
+  npx -y dba-master install
 ```
 
 Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
 (`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
 (`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
+O workflow interativo de skill `dba-investigate` também será posicionado nos diretórios de configuração apropriados para o agente escolhido.
 
-No Claude Code, alternativamente via CLI:
+No Claude Code, alternativamente via CLI (Apenas servidor MCP):
 
 ```bash
 claude mcp add dba-master -s user \
   -e DB_USER=usuario -e DB_PASSWORD=senha \
   -e DB_CONNECT_STRING=host:1521/service_name \
   -- npx -y dba-master
-```
-
-## Skill/comando `dba-investigate`
-
-Instala o workflow que orienta o agente a investigar o schema com as tools e propor
-soluções. Fonte única em `agents/commands/dba-investigate.md`, adaptada ao formato nativo
-de cada agente (slash command, skill pessoal ou workflow):
-
-```bash
-npx -y dba-master install-agents                 # todos
-npx -y dba-master install-agents --agent copilot # só um
 ```
 
 ## Outros clientes MCP (manual)

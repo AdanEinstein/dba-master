@@ -5,14 +5,11 @@ sem clonar nem buildar.
 
 ## Usar sem o repositório (usuário final)
 
-O jeito mais simples é o subcomando `install-mcp`, que registra `npx -y dba-master` no config
-de cada agente e grava as credenciais no bloco `env` (o pacote npx **não tem `.env` ao lado**
-— a config vem do ambiente):
+O jeito mais simples é o subcomando `install`, que registra o servidor MCP `npx -y dba-master` no config de cada agente e a skill respectiva em uma interface iterativa onde você pode escolher os agentes:
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install-mcp                 # todos os agentes
-  npx -y dba-master install-mcp --agent claude  # só um
+  npx -y dba-master install
 ```
 
 Sem as vars no ambiente, grava placeholders `<DB_USER>` etc. para editar depois.
@@ -43,19 +40,7 @@ Ou config manual em qualquer cliente MCP:
 Modo **thin** (default) não exige Oracle Instant Client. Variáveis completas em
 [instalacao.md](instalacao.md).
 
-### Instalar o comando `dba-investigate` (sem o repo)
 
-O server acima expõe as *tools*. Para instalar também o comando/skill `dba-investigate`
-(workflow que orienta o agente a usar as tools), sem clonar o repo:
-
-```bash
-npx -y dba-master install-agents            # claude, copilot, opencode, antigravity
-npx -y dba-master install-agents --agent claude
-```
-
-Escreve o comando no dir nativo de cada agente (Claude/Copilot/Opencode/Antigravity).
-Reabra/recarregue o agente. Precisa do server MCP registrado (passo acima) para as tools
-existirem.
 
 ## Cortar um release (mantenedor)
 

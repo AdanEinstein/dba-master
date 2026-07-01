@@ -9,18 +9,16 @@ Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só 
 
 Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx` (as credenciais vão no bloco `env` do cliente MCP, pois o pacote npx não tem `.env` ao lado).
 
-**1. Registrar o server MCP** nos agentes (Claude, Copilot, Opencode, Antigravity):
+**1. Iniciar o instalador unificado**
 
 ```bash
 DB_USER=usuario DB_PASSWORD=senha DB_CONNECT_STRING=host:1521/service_name \
-  npx -y dba-master install-mcp                 # project scoped (default, na pasta atual)
-  npx -y dba-master install-mcp -g              # global (todos os agentes)
-  npx -y dba-master install-mcp -g --agent claude # só um (global)
+  npx -y dba-master install
 ```
 
-Sem as vars no ambiente, grava placeholders `<DB_USER>` etc. para editar depois.
+O comando abrirá uma interface iterativa onde você poderá selecionar quais agentes deseja configurar (Claude, Copilot, Opencode, Antigravity). As credenciais vêm do ambiente e são gravadas no bloco `env` do cliente MCP. Se ausentes, gravam placeholders `<DB_USER>` etc. para editar depois.
 
-No Claude Code, alternativamente via CLI:
+No Claude Code, alternativamente via CLI (apenas MCP):
 
 ```bash
 claude mcp add dba-master -s user \
@@ -43,14 +41,7 @@ Outros clientes MCP (manual, via stdio):
 }
 ```
 
-**2. Instalar o comando `dba-investigate`** (workflow que orienta o agente a usar as tools):
-
-```bash
-npx -y dba-master install-agents                # project scoped (default)
-npx -y dba-master install-agents -g             # global
-```
-
-Reabra/recarregue o agente após instalar.
+Reabra/recarregue o agente após instalar. O agente vai ganhar as ferramentas MCP e o comando `/dba-investigate` (workflow que orienta o agente a usar as tools).
 
 ### Setup a partir do repositório (dev)
 
