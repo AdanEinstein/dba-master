@@ -53,9 +53,13 @@ Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli),
 
 ## 2. Skill/comando `dba-investigate`
 
+Subcomando da própria bin (cross-platform, sem bash) — funciona via npm ou a partir do repo:
+
 ```bash
-bash agents/install.sh                  # todos os agentes
-bash agents/install.sh --agent claude   # só um
+npx -y dba-master install-agents                 # via npm (sem o repo)
+npx -y dba-master install-agents --agent claude  # só um
+
+node dist/index.js install-agents                # a partir do repo (após npm run build)
 ```
 
 Fonte em `agents/commands/dba-investigate.md`. Cada agente recebe o formato nativo:

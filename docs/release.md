@@ -41,6 +41,20 @@ npm i -g dba-master
 Modo **thin** (default) não exige Oracle Instant Client. Variáveis completas em
 [instalacao.md](instalacao.md).
 
+### Instalar o comando `dba-investigate` (sem o repo)
+
+O server acima expõe as *tools*. Para instalar também o comando/skill `dba-investigate`
+(workflow que orienta o agente a usar as tools), sem clonar o repo:
+
+```bash
+npx -y dba-master install-agents            # claude, copilot, opencode, antigravity
+npx -y dba-master install-agents --agent claude
+```
+
+Escreve o comando no dir nativo de cada agente (Claude/Copilot/Opencode/Antigravity).
+Reabra/recarregue o agente. Precisa do server MCP registrado (passo acima) para as tools
+existirem.
+
 ## Cortar um release (mantenedor)
 
 A versão publicada é **derivada da tag** — não edite `version` no `package.json` à mão.

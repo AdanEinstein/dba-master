@@ -24,11 +24,13 @@ claude mcp add dba-master -s user -- node <proj>/dist/index.js
 
 Instala o workflow que orienta o agente a investigar o schema com as tools e propor
 soluções. Fonte única em `agents/commands/dba-investigate.md`, adaptada ao formato nativo
-de cada agente (slash command, skill pessoal ou workflow).
+de cada agente (slash command, skill pessoal ou workflow). É um subcomando da própria bin:
 
 ```bash
-bash agents/install.sh                  # todos
-bash agents/install.sh --agent copilot  # só um
+npx -y dba-master install-agents                 # via npm (sem o repo)
+npx -y dba-master install-agents --agent copilot # só um
+
+node dist/index.js install-agents                # a partir do repo (após npm run build)
 ```
 
 ## Outros clientes MCP (manual)
