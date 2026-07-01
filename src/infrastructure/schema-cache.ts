@@ -45,5 +45,30 @@ export async function writeTableCache(
 
   await mkdir(dir, { recursive: true });
   await writeFile(file, content, "utf8");
+
+  const connectionDir = join(cacheDir, connectionName);
+  const tsConfigPath = join(connectionDir, "tsconfig.json");
+  try {
+    await writeFile(
+      tsConfigPath,
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: "esnext",
+            moduleResolution: "node",
+            allowJs: true,
+            skipLibCheck: true,
+          },
+          include: ["**/*.ts"],
+        },
+        null,
+        2
+      ),
+      { flag: "wx" }
+    );
+  } catch {
+    // ignora erro (arquivo já existe)
+  }
+
   return file;
 }
