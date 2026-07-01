@@ -1,4 +1,4 @@
-import { intro, outro, multiselect, spinner, isCancel, cancel } from "@clack/prompts";
+import { intro, outro, multiselect, spinner, isCancel, cancel, log } from "@clack/prompts";
 import cfonts from "cfonts";
 import { installMcp } from "./install-mcp.js";
 import { installAgents } from "./install-agents.js";
@@ -42,15 +42,24 @@ export async function runInstaller() {
   const s = spinner();
   s.start("Configurando agentes selecionados...");
 
+  const failedAgents: { agent: string, error: unknown }[] = [];
+
   for (const agent of (agents as string[])) {
     try {
       installMcp([`--agent`, agent]);
       installAgents([`--agent`, agent]);
     } catch (e) {
-      // Ignorar erros individuais para não parar o fluxo
+      failedAgents.push({ agent, error: e });
     }
   }
 
-  s.stop("Agentes configurados com sucesso!");
+  if (failedAgents.length === 0) {
+    s.stop("Agentes configurados com sucesso!");
+  } else {
+    s.stop("Configuração finalizada, mas houve problemas.");
+    for (const { agent, error } of failedAgents) {
+      log.warn(`Falha ao instalar o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   outro("Instalação concluída! Lembre-se de reiniciar seus agentes.");
 }
