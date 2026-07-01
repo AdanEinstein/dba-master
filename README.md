@@ -3,6 +3,45 @@
 Servidor MCP (Model Context Protocol) que dá a um agente de IA introspecção profunda de banco de dados — estrutura, DDL, relacionamentos, procedures, jobs — em **JSON estruturado**,
 para investigar o schema e propor soluções (queries, modelagem, diagnósticos) com assertividade.
 
+```bash
+
+ ██████╗  ██████╗   █████╗         ███╗   ███╗  █████╗  ███████╗ ████████╗ ███████╗ ██████╗ 
+ ██╔══██╗ ██╔══██╗ ██╔══██╗        ████╗ ████║ ██╔══██╗ ██╔════╝ ╚══██╔══╝ ██╔════╝ ██╔══██╗
+ ██║  ██║ ██████╔╝ ███████║ █████╗ ██╔████╔██║ ███████║ ███████╗    ██║    █████╗   ██████╔╝
+ ██║  ██║ ██╔══██╗ ██╔══██║ ╚════╝ ██║╚██╔╝██║ ██╔══██║ ╚════██║    ██║    ██╔══╝   ██╔══██╗
+ ██████╔╝ ██████╔╝ ██║  ██║        ██║ ╚═╝ ██║ ██║  ██║ ███████║    ██║    ███████╗ ██║  ██║
+ ╚═════╝  ╚═════╝  ╚═╝  ╚═╝        ╚═╝     ╚═╝ ╚═╝  ╚═╝ ╚══════╝    ╚═╝    ╚══════╝ ╚═╝  ╚═╝
+
+
+┌  Bem-vindo ao instalador do DBA-Master!
+│
+◇  Quais agentes de IA você deseja configurar para o dba-master?
+│  Claude Desktop / Claude Code, Copilot CLI, Opencode, Antigravity
+│
+◇  Onde deseja instalar as configurações e dados (escopo)?
+│  Project scoped (na pasta atual)
+│
+◇  Dê um nome para esta conexão (ex: prod_db, homolog, default):
+│  default
+│
+◇  Selecione o motor de banco de dados (engine):
+│  Oracle Database
+│
+◇  Usuário do banco de dados:
+│  teste
+│
+◇  Senha do banco de dados:
+│  ▪▪▪
+│
+◇  String de conexão (ex: localhost:1521/ORCL):
+│  localhost:1521/FREEPDB1
+│
+◇  O arquivo connections.json já possui conexões configuradas. O que deseja fazer?
+│  Sobrescrever o arquivo inteiro apagando outras conexões
+│
+◆  Conexão salva em /home/.../dba-master/.dba-master/connections.json
+```
+
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só use `DB_CLIENT_MODE=thick` se precisar de recursos específicos do client nativo.
 
 ## Instalação e Configuração

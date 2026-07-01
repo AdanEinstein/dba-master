@@ -149,6 +149,13 @@ export async function runInstaller() {
   const s = spinner();
   s.start("Configurando agentes selecionados...");
 
+  // Ponte das respostas do prompt para o process.env — envBlock() em install-mcp.ts
+  // lê daqui pra montar o bloco `env` dos configs MCP (senão gravaria placeholders).
+  process.env.DB_USER = dbUser as string;
+  process.env.DB_PASSWORD = dbPassword as string;
+  process.env.DB_CONNECT_STRING = connectString as string;
+  process.env.DB_ENGINE = engine as string;
+
   const failedAgents: { agent: string, error: unknown }[] = [];
 
   for (const agent of (agents as string[])) {
