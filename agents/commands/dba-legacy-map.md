@@ -34,11 +34,6 @@ comece pelo recorte do alvo, não pelo schema inteiro.
    contando órfãos (`LEFT JOIN alvo ... WHERE pk IS NULL`), cheque cardinalidade e nulos.
 
 ## Como responder
-
-- Entregue um **mapa**: tabelas centrais, relações (declaradas e inferidas, marcando a
-  confiança), lógica em PL/SQL/jobs e riscos (FKs órfãs, ausência de índice, nomes ambíguos).
-- FK implícita `high` = trate como relação provável; `medium` = hipótese, sugira a query de
-  validação. Nunca apresente inferência como constraint declarada.
-- Se faltar informação, diga qual tool rodar em seguida — não invente estrutura.
-- **Antes de fechar, passe pelo gate `dba-wiring`**: nada na resposta pode ficar sem origem
-  em tool.
+1. Entregue um mapa com tabelas, relações (declaradas/inferidas), lógica PL/SQL e riscos; e trate FK implícita `high` como provável e `medium` como hipótese (nunca apresentando inferência como constraint).
+2. Se faltar informação, diga qual tool rodar em seguida sem inventar estrutura.
+3. Feche sempre a sua resposta passando pelo gate da skill `dba-wiring`.

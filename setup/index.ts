@@ -325,7 +325,10 @@ export async function runConfigure() {
         const editEngine = await select({
           message: "Selecione o motor de banco de dados (engine):",
           options: [
-            { value: "oracle", label: "Oracle Database" }
+            { value: "oracle", label: "Oracle Database" },
+            { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+            { value: "mysql", label: "MySQL (Em breve)", disabled: true },
+            { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
           ],
           initialValue: connToEdit.engine
         }) as string;
@@ -372,7 +375,10 @@ export async function runConfigure() {
       const engine = await select({
         message: "Selecione o motor de banco de dados (engine):",
         options: [
-          { value: "oracle", label: "Oracle Database" }
+          { value: "oracle", label: "Oracle Database" },
+          { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+          { value: "mysql", label: "MySQL (Em breve)", disabled: true },
+          { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
         ]
       }) as string;
       if (isCancel(engine)) { cancel("Cancelado"); process.exit(0); }

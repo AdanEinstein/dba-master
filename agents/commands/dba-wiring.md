@@ -40,8 +40,6 @@ Rode antes de entregar. Se algum passo falhar, volte para as tools — não entr
 - [ ] Gaps de informação nomeados (qual tool rodar em seguida), não inventados
 
 ## Como responder
-
-- Se tudo passou: entregue o SQL/modelo com os nomes reais e uma linha de proveniência
-  por afirmação não-óbvia.
-- Se algo falhou: diga qual passo falhou e qual tool rodar para fechar o gap. Não entregue
-  o que não passou no gate.
+1. Se tudo passou: entregue o SQL/modelo com os nomes reais e uma linha de proveniência por afirmação não-óbvia.
+2. Se algo falhou: diga qual passo falhou e qual tool rodar para fechar o gap. Não entregue o que não passou no gate.
+3. Feche sempre a sua resposta passando pelo gate da skill `dba-wiring`.

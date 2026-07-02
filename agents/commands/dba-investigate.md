@@ -29,10 +29,6 @@ comece estreito para não afogar o contexto.
    Escrita (INSERT/UPDATE/DDL) só se `READ_ONLY=false`.
 
 ## Como responder
-
-- Fundamente cada afirmação no que as tools retornaram (cite tabela/coluna/FK).
-- Entregue SQL pronto para uso, com os nomes de schema/coluna reais que você descobriu.
-- Aponte riscos: FKs de entrada afetadas, índices ausentes para o filtro proposto,
-  colunas anuláveis que exigem tratamento.
-- Se faltar informação, diga qual tool rodar em seguida — não invente estrutura.
-- Antes de fechar, passe pelo gate `dba-wiring`: cada afirmação precisa ter origem em tool.
+1. Fundamente cada afirmação e entregue o SQL pronto para uso com nomes reais (cite tabela/coluna/FK).
+2. Aponte riscos (ex: FKs afetadas, índices ausentes) e, se faltar informação, indique a próxima tool sem inventar estrutura.
+3. Feche sempre a sua resposta passando pelo gate da skill `dba-wiring`.
