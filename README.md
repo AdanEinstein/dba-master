@@ -203,7 +203,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `generate_interfaces` | Compila em lote a interface `.ts` de todas as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** inferidas por convenção de nome (banco legado), com confiança e evidência | `schema?` |
-| `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type | `name`, `schema?`, `objectType?` |
+| `get_ddl` | DDL de objetos. Oracle: tabela/view/procedure/package/trigger/sequence/type (via `DBMS_METADATA`). Postgres: table (reconstruída de colunas/constraints), view/materialized view e function/procedure (nativo) | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions com assinatura de parâmetros | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas com assinaturas | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
