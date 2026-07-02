@@ -1,6 +1,6 @@
 {
   "name": "dba-master",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "MCP server para introspecção profunda de bancos Oracle, voltado a consumo por agentes de IA",
   "type": "module",
   "bin": {
