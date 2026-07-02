@@ -10,6 +10,15 @@ import { showBanner } from "./banner.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Exemplo de connectString por engine, mostrado no prompt do configure.
+const CONNECT_EXAMPLE: Record<string, string> = {
+  oracle: "localhost:1521/ORCL",
+  postgres: "postgresql://user:senha@localhost:5432/db",
+  mysql: "mysql://user:senha@localhost:3306/db",
+  sqlserver: "Server=localhost,1433;Database=db",
+};
+const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
+
 export async function runInstaller() {
   console.clear();
 
@@ -307,7 +316,7 @@ export async function runConfigure() {
         if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
 
         const editConnectString = await text({
-          message: "String de conexão (ex: localhost:1521/ORCL):",
+          message: `String de conexão (ex: ${connectExample(editEngine)}):`,
           defaultValue: connToEdit.connectString
         }) as string;
         if (isCancel(editConnectString)) { cancel("Cancelado"); process.exit(0); }
@@ -355,7 +364,7 @@ export async function runConfigure() {
       if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
 
       const connectString = await text({
-        message: "String de conexão (ex: localhost:1521/ORCL):"
+        message: `String de conexão (ex: ${connectExample(engine)}):`
       }) as string;
       if (isCancel(connectString)) { cancel("Cancelado"); process.exit(0); }
 
