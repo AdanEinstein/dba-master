@@ -30,6 +30,10 @@ const COMMANDS: Command[] = [
     cmd: "dba-script-gen",
     desc: "Gera SQL de reprocessamento (idempotente, transacional) no dialeto da conexão atual a partir da estrutura confirmada pelas tools do dba-master",
   },
+  {
+    cmd: "dba-pg-monitor",
+    desc: "Monitora e diagnostica Postgres (sessões, locks, vacuum, bloat, replicação) via pg_monitor; encerra sessões via pg_kill_session quando autorizado",
+  },
 ];
 
 const HERE = dirname(fileURLToPath(import.meta.url));

@@ -199,6 +199,8 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_packages` | Packages e seus subprogramas com assinaturas | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
 | `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
+| `pg_monitor` | **Só Postgres, leitura.** Monitoramento: sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
+| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `READ_ONLY=false` | `pid`, `mode?` |
 
 **Parâmetros comuns:**
 - **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
@@ -212,6 +214,22 @@ Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem u
 ### `run_sql` e o modo read-only
 
 Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
+
+### Monitoramento Postgres (`pg_monitor` / `pg_kill_session`)
+
+Exclusivas do engine Postgres. `pg_monitor` é somente leitura — cada `check` é um `SELECT`
+fixo sobre `pg_stat_*`/`pg_catalog` (fica sempre dentro do read-only). Escolha a métrica em
+`check`: atividade (`active_queries`, `long_transactions`), sessões (`connections_usage`,
+`idle_in_transaction`), locks (`blocking_locks`, `deadlocks`), `top_queries` (exige extensão
+`pg_stat_statements`; `orderBy` total/mean/max), vacuum (`dead_tuples`, `wraparound`), storage
+(`table_sizes`, `cache_hit`), índices (`unused_indexes`, `seq_scans`), WAL (`wal_stats`,
+`checkpoints`) e replicação (`replication`, `replication_slots`). Colunas divergentes entre
+PG16- e PG17+ (`top_queries`, `checkpoints`) são resolvidas por detecção automática de versão.
+Lista completa dos `check` em [docs/tools.md](docs/tools.md).
+
+`pg_kill_session(pid, mode)` é a única ação destrutiva: `cancel` (reversível) ou `terminate`
+(ROLLBACK). Bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
+Para diagnósticos guiados, use o comando `/dba-pg-monitor`.
 
 ### Cache de tipos
 

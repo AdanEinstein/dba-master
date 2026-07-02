@@ -23,6 +23,8 @@ por outro agente de IA — não para leitura humana direta.
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
 | `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`, limita linhas | `sql`, `maxRows?` |
+| `pg_monitor` | **Só Postgres.** Monitoramento (leitura): sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação. Escolha a métrica em `check` (ver abaixo) | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
+| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `READ_ONLY=false` na conexão | `pid`, `mode?` |
 
 ## Parâmetros comuns
 
@@ -43,6 +45,28 @@ Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam
 (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro
 token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário
 de banco read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
+
+## Monitoramento Postgres (`pg_monitor` / `pg_kill_session`)
+
+Exclusivas do engine Postgres (retornam erro claro em Oracle). `pg_monitor` é somente
+leitura — cada `check` é um `SELECT` fixo sobre `pg_stat_*`/`pg_catalog`, então fica
+sempre dentro do modo read-only, independente da flag da conexão.
+
+Valores de `check`, por área:
+
+- **Atividade:** `active_queries` (executando agora), `all_activity` (tudo != idle), `long_transactions` (transações abertas mais antigas — travam vacuum e retêm WAL).
+- **Sessões:** `sessions_by_state`, `connections_by_source` (leak por usuário/app/IP), `connections_usage` (uso vs `max_connections`), `idle_in_transaction` (aceita `idleMinutes`, default 5).
+- **Locks:** `blocking_locks` (árvore via `pg_blocking_pids`), `locks_detail` (por tipo/relação/modo), `deadlocks`.
+- **Queries:** `top_queries` — exige a extensão `pg_stat_statements`. `orderBy` = `total` (I/O+CPU agregado, default), `mean` (média por chamada) ou `max` (pior pico); `limit` (default 5). Ramifica automaticamente as colunas por versão (PG16- × PG17+).
+- **Vacuum:** `vacuum_progress`, `dead_tuples`, `wraparound` (**crítico**: XIDs restantes até read-only forçado), `autovacuum_config`.
+- **Storage:** `table_sizes` (tamanho + estimativa heurística de bloat via dead/live tuples), `database_sizes`, `cache_hit` (ideal > 99% em OLTP).
+- **Índices:** `unused_indexes` (candidatos a DROP — validar em período representativo; nunca dropar PK/UNIQUE), `seq_scans` (candidatos a indexar), `index_cache_hit`.
+- **WAL/checkpoint:** `wal_stats`, `checkpoints` (ramifica `pg_stat_bgwriter` × `pg_stat_checkpointer` por versão).
+- **Replicação:** `replication` (lag de standby físico), `replication_slots` (slot `active=false` retém WAL — monitorar sempre), `publications`, `subscriptions`.
+
+`pg_kill_session` é a única ação destrutiva: cancela (`mode: "cancel"`, `pg_cancel_backend`,
+reversível) ou derruba (`mode: "terminate"`, `pg_terminate_backend`, faz ROLLBACK) o backend
+do `pid`. Bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
 
 ## Cache de tipos
 

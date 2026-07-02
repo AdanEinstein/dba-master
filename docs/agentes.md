@@ -15,13 +15,14 @@ npx -y dba-master@latest install
 Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
 (`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
 (`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
-As skills `dba-investigate`, `dba-wiring`, `dba-legacy-map`, `dba-reprocessor` e `dba-script-gen` também serão posicionadas nos diretórios de configuração apropriados para o agente escolhido:
+As skills `dba-investigate`, `dba-wiring`, `dba-legacy-map`, `dba-reprocessor`, `dba-script-gen` e `dba-pg-monitor` também serão posicionadas nos diretórios de configuração apropriados para o agente escolhido:
 
 - `dba-investigate` — investiga o schema (do estreito ao amplo) e propõe queries/modelagem/diagnóstico.
 - `dba-legacy-map` — engenharia reversa de banco legado: reconstrói FKs implícitas (`infer_relationships`), cataloga PL/SQL e jobs, entrega um mapa do schema.
 - `dba-wiring` — gate de verificação: garante que toda entrega esteja ancorada em output real das tools (nada chutado).
 - `dba-reprocessor` — Planeja reprocessamento/correção de dados em massa fundamentado na estrutura real do banco, via tools MCP do dba-master.
 - `dba-script-gen` — Gera SQL de reprocessamento (idempotente, transacional) no dialeto da conexão atual a partir da estrutura confirmada pelas tools do dba-master.
+- `dba-pg-monitor` — Monitora e diagnostica Postgres (sessões, locks, vacuum, bloat, wraparound, replicação) via `pg_monitor`; encerra sessões com `pg_kill_session` quando autorizado.
 
 No Claude Code, alternativamente via CLI (Apenas servidor MCP — credenciais no `connections.json`, via `npx -y dba-master@latest configure`):
 
