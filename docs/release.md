@@ -24,7 +24,7 @@ Ou config manual em qualquer cliente MCP — sem bloco `env`, pois as credenciai
 ```jsonc
 {
   "command": "npx",
-  "args": ["-y", "dba-master"]
+  "args": ["-y", "dba-master@latest"]
 }
 ```
 

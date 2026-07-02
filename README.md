@@ -84,7 +84,7 @@ Outros clientes MCP (manual, via stdio) — sem bloco `env`, pois as credenciais
 ```jsonc
 {
   "command": "npx",
-  "args": ["-y", "dba-master"]
+  "args": ["-y", "dba-master@latest"]
 }
 ```
 

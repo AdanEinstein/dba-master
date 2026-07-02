@@ -40,7 +40,7 @@ Transporte STDIO padrão, a partir do repo buildado:
 Ou sem o repo, via npm (credenciais no `connections.json`, criado com `npx -y dba-master@latest configure` — sem bloco `env`):
 
 ```jsonc
-{ "command": "npx", "args": ["-y", "dba-master"] }
+{ "command": "npx", "args": ["-y", "dba-master@latest"] }
 ```
 
 A chave do bloco varia por cliente (`mcpServers`, `servers`+`type:stdio`, `mcp`+`type:local`).

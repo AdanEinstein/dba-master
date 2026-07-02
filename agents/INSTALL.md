@@ -45,7 +45,7 @@ claude mcp add dba-master -s user -- npx -y dba-master
 O `dba-master` lê nativamente suas credenciais a partir de `.dba-master/connections.json`. Transporte STDIO padrão. Cole no config MCP do agente:
 
 ```jsonc
-{ "command": "npx", "args": ["-y", "dba-master"] }
+{ "command": "npx", "args": ["-y", "dba-master@latest"] }
 ```
 
 Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli), `servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
