@@ -14,8 +14,14 @@ Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só 
 Para fechar o último vetor — o agente conseguir **ler o `connections.json` em texto plano** —, qualquer campo aceita a referência `${NOME_DA_VAR}`, resolvida a partir das variáveis de ambiente no boot do server. Assim o segredo fica **fora do arquivo que o agente lê**, num env var que só o processo do servidor herda:
 
 ```json
-{ "prod": { "engine": "oracle", "user": "${DBA_PROD_USER}",
-    "password": "${DBA_PROD_PASS}", "connectString": "${DBA_PROD_CS}" } }
+{
+    "prod": {
+        "engine": "oracle",
+        "user": "${DBA_PROD_USER}",
+        "password": "${DBA_PROD_PASS}",
+        "connectString": "${DBA_PROD_CS}"
+    }
+}
 ```
 
 O `configure`/`install` grava essas referências por padrão e pode **persistir as env vars no seu ambiente** (com sua permissão): `export` no `~/.zshrc`/`~/.bashrc` (Linux/macOS) ou `setx` no registro do usuário (Windows). Editar uma conexão atualiza as vars; excluí-la — ou rodar `uninstall` — remove-as.
