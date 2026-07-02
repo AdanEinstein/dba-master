@@ -15,8 +15,9 @@ export class PgConnection {
     // continuam como fallback caso a URL não os traga.
     this.pool = new pg.Pool({
       connectionString: this.cfg.connectString,
-      user: this.cfg.user,
-      password: this.cfg.password,
+      // Só passa user/password quando truthy — senão sobrescreveria as creds da URL.
+      ...(this.cfg.user ? { user: this.cfg.user } : {}),
+      ...(this.cfg.password ? { password: this.cfg.password } : {}),
       max: this.cfg.poolMax ?? DEFAULT_POOL_MAX,
     });
     return this.pool;

@@ -319,16 +319,23 @@ export async function runConfigure() {
         }) as string;
         if (isCancel(editEngine)) { cancel("Cancelado"); process.exit(0); }
 
-        const editDbUser = await text({
-          message: "Usuário do banco de dados:",
-          defaultValue: connToEdit.user
-        }) as string;
-        if (isCancel(editDbUser)) { cancel("Cancelado"); process.exit(0); }
+        // Postgres: credenciais vêm embutidas na URL de conexão — não pedir user/senha.
+        let editDbUser = "";
+        let editDbPassword = "";
+        if (editEngine !== "postgres") {
+          editDbUser = await text({
+            message: "Usuário do banco de dados:",
+            defaultValue: connToEdit.user
+          }) as string;
+          if (isCancel(editDbUser)) { cancel("Cancelado"); process.exit(0); }
 
-        const editDbPassword = await promptPassword({
-          message: "Senha do banco de dados (deixe em branco para manter a atual):"
-        }) as string;
-        if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
+          editDbPassword = await promptPassword({
+            message: "Senha do banco de dados (deixe em branco para manter a atual):"
+          }) as string;
+          if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
+        } else {
+          log.info("PostgreSQL: usuário e senha vêm da própria URL de conexão.");
+        }
 
         const editConnectString = await text({
           message: `String de conexão (ex: ${connectExample(editEngine)}):`,
@@ -338,8 +345,8 @@ export async function runConfigure() {
 
         connections[toEdit as string] = {
           engine: editEngine,
-          user: editDbUser || connToEdit.user,
-          password: editDbPassword || connToEdit.password,
+          user: editEngine === "postgres" ? "" : (editDbUser || connToEdit.user),
+          password: editEngine === "postgres" ? undefined : (editDbPassword || connToEdit.password),
           connectString: editConnectString || connToEdit.connectString,
           thick: connToEdit.thick || false
         };
@@ -368,15 +375,22 @@ export async function runConfigure() {
       }) as string;
       if (isCancel(engine)) { cancel("Cancelado"); process.exit(0); }
 
-      const dbUser = await text({
-        message: "Usuário do banco de dados:"
-      }) as string;
-      if (isCancel(dbUser)) { cancel("Cancelado"); process.exit(0); }
+      // Postgres: credenciais vêm embutidas na URL de conexão — não pedir user/senha.
+      let dbUser = "";
+      let dbPassword: string | undefined;
+      if (engine !== "postgres") {
+        dbUser = await text({
+          message: "Usuário do banco de dados:"
+        }) as string;
+        if (isCancel(dbUser)) { cancel("Cancelado"); process.exit(0); }
 
-      const dbPassword = await promptPassword({
-        message: "Senha do banco de dados:"
-      }) as string;
-      if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
+        dbPassword = await promptPassword({
+          message: "Senha do banco de dados:"
+        }) as string;
+        if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
+      } else {
+        log.info("PostgreSQL: usuário e senha vêm da própria URL de conexão.");
+      }
 
       const connectString = await text({
         message: `String de conexão (ex: ${connectExample(engine)}):`
@@ -386,7 +400,7 @@ export async function runConfigure() {
       connections[connectionName as string] = {
         engine: engine,
         user: dbUser,
-        password: dbPassword,
+        password: dbPassword || undefined,
         connectString: connectString,
         thick: false
       };
