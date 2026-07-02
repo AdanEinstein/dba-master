@@ -1,8 +1,12 @@
 # Instalação e configuração
 
 Duas formas: **via npm** (sem clonar) ou **a partir do repo** (dev). Em ambos os casos a
-configuração vem **exclusivamente** do `connections.json` — não há leitura de `.env` nem de
-variáveis de ambiente.
+configuração vem **exclusivamente** do `connections.json`. Segredos podem (e devem) ficar
+fora do arquivo, via referências `${VAR}` — ver [Segredos via env var](#segredos-via-env-var-recomendado).
+
+> **A IA não acessa as credenciais.** Nenhuma tool MCP retorna `user`/`password`/`connectString`
+> — `list_connections` devolve só os nomes. Com `${VAR}`, o segredo nem fica em texto plano no
+> `connections.json` (o único arquivo que o agente leria).
 
 ## Via npm (`npx`)
 
@@ -38,9 +42,9 @@ conexão` (ver `connections.example.json` na raiz):
 {
   "my_conn": {
     "engine": "oracle",
-    "user": "meu_usuario",
-    "password": "minha_senha",
-    "connectString": "host:1521/service_name",
+    "user": "${DBA_MY_CONN_USER}",
+    "password": "${DBA_MY_CONN_PASS}",
+    "connectString": "${DBA_MY_CONN_CS}",
     "thick": false,
     "poolMax": 8,
     "readOnly": true,
@@ -48,7 +52,7 @@ conexão` (ver `connections.example.json` na raiz):
   },
   "my_pg": {
     "engine": "postgres",
-    "connectString": "postgresql://user:senha@localhost:5432/meu_banco",
+    "connectString": "${DBA_MY_PG_CS}",
     "readOnly": true,
     "schemaFilter": ["public"]
   }
@@ -65,6 +69,31 @@ conexão` (ver `connections.example.json` na raiz):
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
 | `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; `[]` (default) = todos os schemas de usuário. Oracle: MAIÚSCULO (exclui mantidos pela Oracle); Postgres: como `public` (exclui `pg_*` e `information_schema`) |
+
+### Segredos via env var (recomendado)
+
+Qualquer campo string (`user`, `password`, `connectString`, `clientLibDir`) aceita a
+referência `${NOME_DA_VAR}`, resolvida a partir do ambiente do processo no boot do
+server (funciona em qualquer SO — é `process.env`, não shell). Assim o segredo **não
+fica em texto plano no `connections.json`** — que agentes de IA conseguem ler. O
+`configure` grava essas referências por padrão. Ele pode ainda **persistir as env vars
+no seu ambiente** (com sua permissão) ou só imprimir os comandos para você colar:
+`export VAR='...'` no `~/.zshrc`/`~/.bashrc` (Linux/macOS) ou `setx VAR "..."` no
+registro do usuário (Windows).
+
+```json
+{ "my_conn": { "engine": "oracle", "user": "${DBA_MY_CONN_USER}",
+    "password": "${DBA_MY_CONN_PASS}", "connectString": "${DBA_MY_CONN_CS}" } }
+```
+
+**Ciclo de vida** (quando você deixa o `configure` persistir): criar grava as vars;
+**editar** atualiza; **excluir** a conexão remove as vars dela; `uninstall` remove as
+de todas as conexões. No POSIX, cada linha no rc leva a tag `# dba-master:<conexão>`.
+
+Se uma var referenciada não existir no ambiente, o server falha no boot nomeando a
+var (não conecta com credencial vazia). É defesa best-effort: mantém o segredo fora
+do arquivo lido casualmente, mas não impede um processo com o mesmo usuário/shell de
+ler o env; para fronteira dura use usuário/container separado ou um keychain do SO.
 
 O cache das interfaces `.ts` não é configurável: é sempre `<pasta do connections.json>/types`
 (ex.: `.dba-master/types`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON
