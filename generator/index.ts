@@ -75,7 +75,11 @@ export async function runGenerate(args: string[]): Promise<void> {
     outro("Concluído!");
   } catch (e) {
     s.stop("Falha ao compilar interfaces.");
-    log.error(e instanceof Error ? e.message : String(e));
+    // AggregateError (ex.: pg em ECONNREFUSED) tem .message vazia — o detalhe fica em .errors[].
+    const detail = e instanceof AggregateError
+      ? e.errors.map((x) => (x instanceof Error ? x.message : String(x))).join("; ")
+      : e instanceof Error ? e.message : String(e);
+    log.error(detail || String(e));
     process.exitCode = 1;
   } finally {
     await mgr.closeAll();
