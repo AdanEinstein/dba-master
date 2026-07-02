@@ -13,7 +13,7 @@ por outro agente de IA — não para leitura humana direta.
 | `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?` |
-| `get_ddl` | DDL de tabela/view/procedure/package/trigger/sequence/type | `name`, `schema?`, `objectType?` |
+| `get_ddl` | DDL de objetos. Oracle: tabela/view/procedure/package/trigger/sequence/type (via `DBMS_METADATA`). Postgres: table (reconstruída), view/materialized view e function/procedure (nativo) | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
@@ -21,22 +21,23 @@ por outro agente de IA — não para leitura humana direta.
 
 ## Parâmetros comuns
 
-- **`schema`** (opcional): escopa a um owner específico. Omitido = todos os schemas
-  acessíveis (exclui os mantidos pela Oracle).
+- **`schema`** (opcional): escopa a um owner/schema específico. Omitido = todos os schemas
+  acessíveis (Oracle: exclui os mantidos pela Oracle; Postgres: exclui `pg_*` e `information_schema`).
 - **`pattern`** (opcional nas listagens): substring do nome, case-insensitive.
 
 ## Capability flag
 
 Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo
 `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }`
-com lista vazia — sem erro. No Oracle, ambos são `true`.
+com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false`
+(não há packages PL/SQL nem scheduler nativo).
 
 ## `run_sql` e o modo read-only
 
 Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita
 (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro
 token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário
-Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
+de banco read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ## Cache de tipos
 

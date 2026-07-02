@@ -26,6 +26,8 @@ npm run build                                                 # compila para dis
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina
 `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
+**Bancos suportados:** Oracle e PostgreSQL, escolhidos pelo campo `engine` (`oracle` | `postgres`).
+
 ## Campos do `connections.json`
 
 O arquivo fica em `./.dba-master/connections.json` (projeto, tem precedência) ou
@@ -43,20 +45,26 @@ conexão` (ver `connections.example.json` na raiz):
     "poolMax": 8,
     "readOnly": true,
     "schemaFilter": ["APP"]
+  },
+  "my_pg": {
+    "engine": "postgres",
+    "connectString": "postgresql://user:senha@localhost:5432/meu_banco",
+    "readOnly": true,
+    "schemaFilter": ["public"]
   }
 }
 ```
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
-| `user` / `password` | sim | Credenciais |
-| `connectString` | sim | Ex.: `host:1521/service_name` |
-| `engine` | não | Engine de banco (default `oracle`) |
-| `thick` | não | `false` (default) usa modo thin; `true` exige Instant Client |
-| `clientLibDir` | não | Libs do client (só thick, caminho não-padrão) |
+| `user` / `password` | sim* | Credenciais. *No Postgres podem vir embutidos na `connectString` (URL) |
+| `connectString` | sim | Oracle: `host:1521/service_name`. Postgres: URL `postgresql://user:senha@host:5432/db` |
+| `engine` | não | Engine de banco: `oracle` (default) ou `postgres` |
+| `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
+| `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
 | `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `schemaFilter` | não | Array de schemas em MAIÚSCULO; `[]` (default) = todos os schemas de usuário |
+| `schemaFilter` | não | Array de schemas; `[]` (default) = todos os schemas de usuário. Oracle: MAIÚSCULO (exclui mantidos pela Oracle); Postgres: como `public` (exclui `pg_*` e `information_schema`) |
 
 O cache das interfaces `.ts` não é configurável: é sempre `<pasta do connections.json>/types`
 (ex.: `.dba-master/types`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON
@@ -110,7 +118,7 @@ npm run typecheck   # tsc --noEmit
 npm test            # self-check do mapeamento de tipos e guarda read-only (sem banco)
 ```
 
-Com um banco Oracle acessível, valide as tools via
+Com um banco Oracle ou PostgreSQL acessível, valide as tools via
 [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash

@@ -44,7 +44,14 @@ para investigar o schema e propor soluções (queries, modelagem, diagnósticos)
 
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
-**Bancos suportados:** Oracle e PostgreSQL. O engine é escolhido pelo campo `engine` da conexão (`oracle` | `postgres`). Recursos exclusivos de um banco (packages PL/SQL e jobs agendados, por ex.) são expostos só onde existem — ver [Capability flag](#capability-flag).
+## Bancos suportados
+
+O engine é escolhido pelo campo `engine` da conexão. Recursos exclusivos de um banco (packages PL/SQL e jobs agendados, por ex.) são expostos só onde existem — ver [Capability flag](#capability-flag).
+
+- [x] **Oracle** (`oracle`) — thin/thick, packages, jobs agendados, DDL via `DBMS_METADATA`
+- [x] **PostgreSQL** (`postgres`) — conexão via URL, DDL nativo (`pg_get_viewdef`/`pg_get_functiondef`) + `CREATE TABLE` reconstruído
+- [ ] **MySQL** — planejado
+- [ ] **SQL Server** — planejado
 
 ## Instalação e Configuração
 
