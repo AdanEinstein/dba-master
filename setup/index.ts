@@ -1,5 +1,4 @@
 import { intro, outro, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
-import cfonts from "cfonts";
 import fs from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,26 +6,14 @@ import { homedir } from "node:os";
 
 import { installMcp, uninstallMcp } from "./install-mcp.js";
 import { installAgents, uninstallAgents } from "./install-agents.js";
+import { showBanner } from "./banner.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function runInstaller() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f80", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "blue"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
 
   intro("Bem-vindo ao instalador do DBA-Master!");
 
@@ -108,21 +95,8 @@ export async function runInstaller() {
 
 export async function runUninstaller() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f00", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "magenta"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f00", "#f40"], gradient: ["red", "magenta"] });
 
   intro("Desinstalador do DBA-Master");
 
@@ -207,21 +181,8 @@ export async function runUninstaller() {
 
 export async function runConfigure() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f80", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "blue"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
 
   intro("Gerenciador de credenciais do DBA-Master");
 
