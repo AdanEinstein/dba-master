@@ -8,5 +8,12 @@
     "poolMax": 8,
     "readOnly": true,
     "schemaFilter": ["APP"]
+  },
+  "my_pg": {
+    "engine": "postgres",
+    "connectString": "postgresql://usuario:senha@host:5432/meu_banco",
+    "poolMax": 8,
+    "readOnly": true,
+    "schemaFilter": ["public"]
   }
 }

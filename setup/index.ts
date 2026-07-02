@@ -1,5 +1,4 @@
-import { intro, outro, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
-import cfonts from "cfonts";
+import { intro, outro, note, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
 import fs from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,37 +6,41 @@ import { homedir } from "node:os";
 
 import { installMcp, uninstallMcp } from "./install-mcp.js";
 import { installAgents, uninstallAgents } from "./install-agents.js";
+import { showBanner } from "./banner.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Exemplo de connectString por engine, mostrado no prompt do configure.
+const CONNECT_EXAMPLE: Record<string, string> = {
+  oracle: "localhost:1521/ORCL",
+  postgres: "postgresql://user:senha@localhost:5432/db",
+  mysql: "mysql://user:senha@localhost:3306/db",
+  sqlserver: "Server=localhost,1433;Database=db",
+};
+const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
+
+// Opções compartilhadas pelos fluxos da TUI — com hint para dar contexto.
+const AGENT_OPTIONS = [
+  { value: "claude", label: "Claude Desktop / Claude Code", hint: "Desktop e Code" },
+  { value: "copilot", label: "Copilot CLI", hint: "GitHub Copilot" },
+  { value: "opencode", label: "Opencode", hint: "opencode.ai" },
+  { value: "antigravity", label: "Antigravity", hint: "Antigravity IDE" },
+];
+const SCOPE_OPTIONS = [
+  { value: "project", label: "Projeto — pasta atual", hint: "./.dba-master" },
+  { value: "global", label: "Global — diretório home", hint: "~/.dba-master" },
+];
+
 export async function runInstaller() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f80", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "blue"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
 
   intro("Bem-vindo ao instalador do DBA-Master!");
 
   const agents = await multiselect({
     message: "Quais agentes de IA você deseja configurar para o dba-master?",
-    options: [
-      { value: "claude", label: "Claude Desktop / Claude Code" },
-      { value: "copilot", label: "Copilot CLI" },
-      { value: "opencode", label: "Opencode" },
-      { value: "antigravity", label: "Antigravity" }
-    ],
+    options: AGENT_OPTIONS,
     required: true
   });
 
@@ -48,10 +51,7 @@ export async function runInstaller() {
 
   const scope = await select({
     message: "Onde deseja instalar as configurações e dados (escopo)?",
-    options: [
-      { value: "project", label: "Project scoped (na pasta atual)" },
-      { value: "global", label: "Global (no diretório home)" }
-    ]
+    options: SCOPE_OPTIONS
   });
   if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
 
@@ -80,8 +80,6 @@ export async function runInstaller() {
   const s = spinner();
   s.start("Configurando agentes selecionados...");
 
-  log.info(`Por favor, rode o comando 'configure' posteriormente para definir as conexões do banco de dados.`);
-
   const failedAgents: { agent: string, error: unknown }[] = [];
 
   for (const agent of (agents as string[])) {
@@ -103,37 +101,31 @@ export async function runInstaller() {
       log.warn(`Falha ao instalar o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  outro("Instalação concluída! Lembre-se de reiniciar seus agentes.");
+
+  note(
+    [
+      `Dados e credenciais em:`,
+      `  ${dbaMasterDir}`,
+      ``,
+      `Próximos passos:`,
+      `  1) Configure as conexões:  npx -y dba-master@latest configure`,
+      `  2) Reinicie os agentes que você configurou`,
+    ].join("\n"),
+    "Instalação concluída",
+  );
+  outro("Tudo pronto — bom proveito! 🚀");
 }
 
 export async function runUninstaller() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f00", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "magenta"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f00", "#f40"], gradient: ["red", "magenta"] });
 
   intro("Desinstalador do DBA-Master");
 
   const agents = await multiselect({
     message: "De quais agentes de IA você deseja remover o dba-master?",
-    options: [
-      { value: "claude", label: "Claude Desktop / Claude Code" },
-      { value: "copilot", label: "Copilot CLI" },
-      { value: "opencode", label: "Opencode" },
-      { value: "antigravity", label: "Antigravity" }
-    ],
+    options: AGENT_OPTIONS,
     required: true
   });
 
@@ -144,10 +136,7 @@ export async function runUninstaller() {
 
   const scope = await select({
     message: "De qual escopo deseja remover as configurações e dados?",
-    options: [
-      { value: "project", label: "Project scoped (na pasta atual)" },
-      { value: "global", label: "Global (no diretório home)" }
-    ]
+    options: SCOPE_OPTIONS
   });
   if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
 
@@ -202,35 +191,26 @@ export async function runUninstaller() {
       log.warn(`Falha ao remover o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  outro("Desinstalação concluída!");
+
+  note(
+    confirmDelete
+      ? "Configurações dos agentes e diretório de dados removidos."
+      : "Configurações dos agentes removidas (o diretório de dados foi mantido).",
+    "Desinstalação concluída",
+  );
+  outro("Até a próxima! 👋");
 }
 
 export async function runConfigure() {
   console.clear();
-  
-  cfonts.say("DBA-MASTER", {
-    font: "block",
-    align: "left",
-    colors: ["#f80", "#f40"],
-    background: "transparent",
-    letterSpacing: 1,
-    lineHeight: 1,
-    space: true,
-    maxLength: "0",
-    gradient: ["red", "blue"],
-    independentGradient: false,
-    transitionGradient: true,
-    env: "node"
-  });
+
+  await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
 
   intro("Gerenciador de credenciais do DBA-Master");
 
   const scope = await select({
     message: "Onde deseja gerenciar as configurações (escopo)?",
-    options: [
-      { value: "project", label: "Project scoped (na pasta atual)" },
-      { value: "global", label: "Global (no diretório home)" }
-    ]
+    options: SCOPE_OPTIONS
   });
   if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
 
@@ -267,15 +247,20 @@ export async function runConfigure() {
     }
   }
 
+  note(
+    `Arquivo: ${jsonPath}\n${Object.keys(connections).length} conexão(ões) configurada(s)`,
+    "Gerenciar conexões",
+  );
+
   let manageLoop = true;
   while (manageLoop) {
     const actionSelect = await select({
       message: "Gerenciar conexões:",
       options: [
-        { value: "create", label: "Criar uma nova conexão" },
-        { value: "edit", label: "Editar uma conexão existente" },
-        { value: "manage", label: "Excluir conexões existentes" },
-        { value: "exit", label: "Sair" }
+        { value: "create", label: "Criar uma nova conexão", hint: "nova credencial" },
+        { value: "edit", label: "Editar uma conexão existente", hint: "alterar credencial" },
+        { value: "manage", label: "Excluir conexões existentes", hint: "remover credencial" },
+        { value: "exit", label: "Sair", hint: "voltar ao terminal" }
       ]
     });
     if (isCancel(actionSelect)) { cancel("Cancelado"); process.exit(0); }
@@ -326,7 +311,7 @@ export async function runConfigure() {
           message: "Selecione o motor de banco de dados (engine):",
           options: [
             { value: "oracle", label: "Oracle Database" },
-            { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+            { value: "postgres", label: "PostgreSQL" },
             { value: "mysql", label: "MySQL (Em breve)", disabled: true },
             { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
           ],
@@ -346,7 +331,7 @@ export async function runConfigure() {
         if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
 
         const editConnectString = await text({
-          message: "String de conexão (ex: localhost:1521/ORCL):",
+          message: `String de conexão (ex: ${connectExample(editEngine)}):`,
           defaultValue: connToEdit.connectString
         }) as string;
         if (isCancel(editConnectString)) { cancel("Cancelado"); process.exit(0); }
@@ -375,8 +360,8 @@ export async function runConfigure() {
       const engine = await select({
         message: "Selecione o motor de banco de dados (engine):",
         options: [
-          { value: "oracle", label: "Oracle Database" },
-          { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+          { value: "oracle", label: "Oracle Database", hint: "thin / thick" },
+          { value: "postgres", label: "PostgreSQL", hint: "via URL" },
           { value: "mysql", label: "MySQL (Em breve)", disabled: true },
           { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
         ]
@@ -394,7 +379,7 @@ export async function runConfigure() {
       if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
 
       const connectString = await text({
-        message: "String de conexão (ex: localhost:1521/ORCL):"
+        message: `String de conexão (ex: ${connectExample(engine)}):`
       }) as string;
       if (isCancel(connectString)) { cancel("Cancelado"); process.exit(0); }
 

@@ -6,7 +6,7 @@ O domínio e as tools dependem de uma **interface** (`DatabaseProvider`), nunca 
 ou dialeto SQL concreto. O acoplamento a um banco específico vive só no seu adapter.
 
 ```
-mcp/tools  →  domain/database-provider (PORT)  ←  infrastructure/oracle (ADAPTER)
+mcp/tools  →  domain/database-provider (PORT)  ←  infrastructure/{oracle,postgres} (ADAPTERS)
 ```
 
 ```
@@ -20,8 +20,12 @@ src/
       oracle-connection.ts          # pool node-oracledb + query()
       oracle-queries.ts             # SQL ALL_*/DBMS_METADATA
       oracle-provider.ts            # implements DatabaseProvider: query + transforma linha→DTO + typeToTs
+    postgres/
+      pg-connection.ts              # pool node-postgres + query() (binds $1)
+      pg-queries.ts                 # SQL information_schema/pg_catalog
+      pg-provider.ts                # implements DatabaseProvider: query + transforma linha→DTO + typeToTs
     schema-cache.ts                 # geração das interfaces .ts (DB-agnóstico)
-    provider-factory.ts             # switch(engine) → provider
+    provider-manager.ts             # createProvider: switch(engine) → provider + gerencia conexões
   mcp/
     shared.ts                       # jsonResult/errorResult + args zod
     register.ts                     # registra todas as tools, injetando o provider
@@ -35,14 +39,14 @@ generator/                          # subcomando `npx -y dba-master@latest gener
 
 Fluxo de dependência unidirecional: `mcp` → port ← `infrastructure`, com `domain`
 compartilhado. Tools e domínio **nunca** importam `oracledb`, `ALL_*` nem `DBMS_METADATA` —
-tudo isso está isolado em `infrastructure/oracle/`.
+tudo isso está isolado nos adapters de `infrastructure/` (`oracle/`, `postgres/`).
 
 ## Adicionar um banco novo
 
 1. Criar `src/infrastructure/<engine>/<engine>-provider.ts` que
    `implements DatabaseProvider`. Recursos que o banco não tem (ex.: packages no Postgres)
    → declarar `capabilities.packages = false`; a tool responde `{ supported: false }` sem erro.
-2. Adicionar um `case "<engine>"` em `src/infrastructure/provider-factory.ts`.
+2. Adicionar um `case "<engine>"` no `createProvider` de `src/infrastructure/provider-manager.ts`.
 3. Selecionar via `"engine": "<engine>"` na conexão do `connections.json`.
 
 Nada muda em `domain/`, `mcp/tools/*` nem `index.ts`.

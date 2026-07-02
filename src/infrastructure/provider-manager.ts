@@ -1,6 +1,7 @@
 import { type Config, type ConnectionConfig } from "../config.js";
 import type { DatabaseProvider } from "../domain/database-provider.js";
 import { OracleProvider } from "./oracle/oracle-provider.js";
+import { PgProvider } from "./postgres/pg-provider.js";
 
 // Gerencia múltiplas conexões
 export class ProviderManager {
@@ -16,8 +17,12 @@ export class ProviderManager {
     switch (connCfg.engine) {
       case "oracle":
         return new OracleProvider(connCfg, globalCfg);
+      case "postgres":
+      case "postgresql":
+      case "pg":
+        return new PgProvider(connCfg, globalCfg);
       default:
-        throw new Error(`Engine de banco não suportado ainda: '${connCfg.engine}'. Suportados: oracle.`);
+        throw new Error(`Engine de banco não suportado ainda: '${connCfg.engine}'. Suportados: oracle, postgres.`);
     }
   }
 
