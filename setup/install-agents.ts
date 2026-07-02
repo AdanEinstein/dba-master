@@ -45,9 +45,11 @@ function write(dest: string, content: string): void {
   writeFileSync(dest, content);
 }
 
-const withFm = (dest: string, c: Command) => write(dest, `---\ndescription: ${c.desc}\n---\n\n${body(c.cmd)}`);
+// ponytail: JSON.stringify → escalar YAML válido (YAML é superset de JSON). Cobre `:`, aspas, `\` sem YAML lib.
+const withFm = (dest: string, c: Command) =>
+  write(dest, `---\ndescription: ${JSON.stringify(c.desc)}\n---\n\n${body(c.cmd)}`);
 const withSkill = (dest: string, c: Command) =>
-  write(dest, `---\nname: ${c.cmd}\ndescription: ${c.desc}\n---\n\n${body(c.cmd)}`);
+  write(dest, `---\nname: ${c.cmd}\ndescription: ${JSON.stringify(c.desc)}\n---\n\n${body(c.cmd)}`);
 
 const AGENTS: Record<string, (c: Command, global: boolean) => void> = {
   claude(c, global) {

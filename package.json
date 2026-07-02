@@ -1,6 +1,6 @@
 {
   "name": "dba-master",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server para introspecção profunda de bancos Oracle, voltado a consumo por agentes de IA",
   "type": "module",
   "bin": {
@@ -49,6 +49,9 @@
     "url": "https://github.com/AdanEinstein/dba-master"
   },
   "contributors": [
-    {"name": "AdanEinstein", "url": "https://github.com/AdanEinstein"}
+    {
+      "name": "AdanEinstein",
+      "url": "https://github.com/AdanEinstein"
+    }
   ]
 }
