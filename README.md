@@ -44,6 +44,8 @@ para investigar o schema e propor soluções (queries, modelagem, diagnósticos)
 
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
+**Bancos suportados:** Oracle e PostgreSQL. O engine é escolhido pelo campo `engine` da conexão (`oracle` | `postgres`). Recursos exclusivos de um banco (packages PL/SQL e jobs agendados, por ex.) são expostos só onde existem — ver [Capability flag](#capability-flag).
+
 ## Instalação e Configuração
 
 Não precisa clonar o repositório. Tudo roda como subcomando da bin via `npx`.
@@ -122,22 +124,30 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
     "poolMax": 8,
     "readOnly": true,
     "schemaFilter": ["APP"]
+  },
+  "pg": {
+    "engine": "postgres",
+    "connectString": "postgresql://user:senha@localhost:5432/meu_banco",
+    "readOnly": true,
+    "schemaFilter": ["public"]
   }
 }
 ```
+
+No Postgres, `user`/`password` podem vir embutidos na URL da `connectString` (como no exemplo `pg` acima) ou informados nos campos próprios.
 
 Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
-| `user` / `password` | sim | Credenciais |
-| `connectString` | sim | Ex.: `host:1521/service_name` |
-| `engine` | não | Engine de banco (default `oracle`) |
-| `thick` | não | `false` (default) usa modo thin; `true` exige Instant Client |
-| `clientLibDir` | não | Libs do client (só thick, caminho não-padrão) |
+| `user` / `password` | sim* | Credenciais. *No Postgres podem vir embutidos na `connectString` (URL) |
+| `connectString` | sim | Oracle: `host:1521/service_name`. Postgres: URL `postgresql://user:senha@host:5432/db` |
+| `engine` | não | Engine de banco: `oracle` (default) ou `postgres` |
+| `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
+| `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
 | `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
-| `schemaFilter` | não | Array de schemas em MAIÚSCULO; vazio (`[]`, default) = todos os schemas de usuário (exclui os mantidos pela Oracle) |
+| `schemaFilter` | não | Array de schemas; vazio (`[]`, default) = todos os schemas de usuário. Oracle: nomes em MAIÚSCULO (exclui os mantidos pela Oracle); Postgres: nomes como `public` (exclui `pg_*` e `information_schema`) |
 
 O `cacheDir` não é configurável: é sempre `<pasta do connections.json>/types` (ex.: `.dba-master/types`).
 
@@ -166,7 +176,7 @@ arquivos antigos (o cache pula objetos inalterados via validação de hash).
 
 ### Verificação
 
-Com um banco Oracle acessível, valide as tools via [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+Com um banco Oracle ou PostgreSQL acessível, valide as tools via [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
 npx @modelcontextprotocol/inspector npx -y dba-master@latest
@@ -206,7 +216,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 
 ### Capability flag
 
-Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }` com lista vazia — sem erro. No Oracle, ambos são `true`.
+Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }` com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false` (não há packages PL/SQL nem scheduler nativo).
 
 ### `run_sql` e o modo read-only
 
