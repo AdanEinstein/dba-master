@@ -1,10 +1,12 @@
 import oracledb from "oracledb";
 import { type ConnectionConfig, DEFAULT_POOL_MAX } from "../../config.js";
+import { withTunnel, type Tunnel } from "../tunnel/index.js";
 
 // Conexão específica do Oracle: pool node-oracledb e execução de queries cruas.
 
 export class OracleConnection {
   private pool: oracledb.Pool | undefined;
+  private tunnel: Tunnel | null = null;
 
   constructor(private readonly cfg: ConnectionConfig) {}
 
@@ -18,10 +20,15 @@ export class OracleConnection {
     oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
     oracledb.fetchAsString = [oracledb.CLOB];
 
+    // Se houver bloco tunnel, abre o transporte (lazy) e reescreve o connectString
+    // para a porta local do túnel; senão passthrough.
+    const { connectString, tunnel } = await withTunnel(this.cfg);
+    this.tunnel = tunnel;
+
     this.pool = await oracledb.createPool({
       user: this.cfg.user,
       password: this.cfg.password,
-      connectString: this.cfg.connectString,
+      connectString,
       poolMin: 0,
       poolMax: this.cfg.poolMax ?? DEFAULT_POOL_MAX,
     });
@@ -49,5 +56,7 @@ export class OracleConnection {
       await this.pool.close(5);
       this.pool = undefined;
     }
+    await this.tunnel?.close();
+    this.tunnel = null;
   }
 }

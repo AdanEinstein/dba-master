@@ -40,9 +40,21 @@ function shellRcPath(): string {
 const isRef = (s?: string): boolean => typeof s === "string" && /^\$\{\w+\}$/.test(s);
 // Tag que marca as linhas de uma conexão no rc, p/ upsert e remoção idempotentes.
 const rcTag = (connName: string) => `# dba-master:${connName}`;
-// Nomes de env var de uma conexão, por engine (postgres só tem CS na URL).
-const envVarsFor = (connName: string, engine: string) =>
-  (engine === "postgres" ? ["CS"] : ["USER", "PASS", "CS"]).map(f => envVarName(connName, f));
+// Nomes de env var referenciados por uma conexão (topo + bloco tunnel). Varre os
+// valores ${VAR} realmente presentes — inclui os segredos do túnel. Usado no Windows
+// (reg delete por nome); no POSIX a remoção é por tag e cobre tudo da conexão.
+function envRefsInConn(conn: any): string[] {
+  const names = new Set<string>();
+  const scan = (o: any) => {
+    for (const v of Object.values(o ?? {})) {
+      if (typeof v === "string") { const m = v.match(/^\$\{(\w+)\}$/); if (m) names.add(m[1]); }
+      else if (Array.isArray(v)) v.forEach(x => typeof x === "string" && x.match(/^\$\{(\w+)\}$/) && names.add(x.slice(2, -1)));
+      else if (v && typeof v === "object") scan(v);
+    }
+  };
+  scan(conn);
+  return [...names];
+}
 
 // Upsert de env vars no ambiente do usuário. Windows: setx (registro). POSIX: uma
 // linha por var no rc, com tag da conexão; substitui a linha da var se já existe.
@@ -65,9 +77,9 @@ function upsertEnvVars(connName: string, pairs: Array<[string, string]>): { targ
 
 // Remove do ambiente do usuário as env vars de uma conexão. Windows: reg delete por
 // nome (ignora ausentes). POSIX: dropa toda linha marcada com a tag da conexão.
-function removeEnvVars(connName: string, engine: string): { target: string } {
+function removeEnvVars(connName: string, conn: any): { target: string } {
   if (process.platform === "win32") {
-    for (const v of envVarsFor(connName, engine)) {
+    for (const v of envRefsInConn(conn)) {
       try { execFileSync("reg", ["delete", "HKCU\\Environment", "/v", v, "/f"], { stdio: "ignore" }); }
       catch { /* var não existia — ok */ }
     }
@@ -81,31 +93,21 @@ function removeEnvVars(connName: string, engine: string): { target: string } {
   return { target: rc };
 }
 
-// Fluxo interativo de env-refs p/ uma conexão (create/edit): pergunta se guarda como
-// referência e se persiste; só converte/persiste campos com plaintext novo (refs
-// existentes ficam intactas). Devolve os valores a gravar no connections.json.
-async function applyEnvRefs(
+// Núcleo reutilizável: recebe candidatos (campos plaintext a virar ${VAR}), pergunta
+// se guarda como referência e se persiste, e aplica a ref via cand.set. Usado tanto
+// pelas credenciais do banco quanto pelos segredos do túnel.
+async function offerEnvRefs(
   name: string,
-  engine: string,
-  vals: { user?: string; password?: string; connectString: string }
-): Promise<{ userVal?: string; passVal?: string; csVal: string }> {
-  let userVal = vals.user;
-  let passVal = vals.password;
-  let csVal = vals.connectString;
-
-  // Candidatos: campos com plaintext (não vazio e ainda não são ${...}).
-  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
-  if (engine !== "postgres" && userVal && !isRef(userVal)) cand.push({ field: "USER", val: userVal, set: r => (userVal = r) });
-  if (engine !== "postgres" && passVal && !isRef(passVal)) cand.push({ field: "PASS", val: passVal, set: r => (passVal = r) });
-  if (csVal && !isRef(csVal)) cand.push({ field: "CS", val: csVal, set: r => (csVal = r) });
-  if (cand.length === 0) return { userVal, passVal, csVal };
+  cand: Array<{ field: string; val: string; set: (ref: string) => void }>
+): Promise<void> {
+  if (cand.length === 0) return;
 
   const useEnvRefs = await confirm({
     message: "Guardar credenciais como referência a env var? (recomendado — mantém o segredo fora do connections.json, que agentes de IA conseguem ler)",
     initialValue: true
   });
   if (isCancel(useEnvRefs)) { cancel("Cancelado"); process.exit(0); }
-  if (!useEnvRefs) return { userVal, passVal, csVal };
+  if (!useEnvRefs) return;
 
   const pairs: Array<[string, string]> = cand.map(c => {
     const v = envVarName(name, c.field);
@@ -138,7 +140,132 @@ async function applyEnvRefs(
       "Adicione estas env vars ao seu ambiente"
     );
   }
+}
+
+// Credenciais do banco: monta candidatos USER/PASS/CS (só plaintext novo) e delega
+// ao núcleo. Refs ${...} existentes ficam intactas. Devolve os valores a gravar.
+async function applyEnvRefs(
+  name: string,
+  engine: string,
+  vals: { user?: string; password?: string; connectString: string }
+): Promise<{ userVal?: string; passVal?: string; csVal: string }> {
+  let userVal = vals.user;
+  let passVal = vals.password;
+  let csVal = vals.connectString;
+
+  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
+  if (engine !== "postgres" && userVal && !isRef(userVal)) cand.push({ field: "USER", val: userVal, set: r => (userVal = r) });
+  if (engine !== "postgres" && passVal && !isRef(passVal)) cand.push({ field: "PASS", val: passVal, set: r => (passVal = r) });
+  if (csVal && !isRef(csVal)) cand.push({ field: "CS", val: csVal, set: r => (csVal = r) });
+
+  await offerEnvRefs(name, cand);
   return { userVal, passVal, csVal };
+}
+
+// Fluxo interativo do túnel/proxy de uma conexão (create/edit). Nem toda conexão
+// precisa — pergunta primeiro. Segredos (chave PEM, senha, passphrase, URL de proxy)
+// passam pela mesma indireção ${VAR}. Devolve o bloco tunnel ou undefined (sem túnel).
+async function configureTunnel(name: string, existing?: any): Promise<any | undefined> {
+  const wants = await confirm({
+    message: "Este banco só é acessível via túnel/proxy (bastion SSH, SOCKS/HTTP, comando externo)?",
+    initialValue: !!existing
+  });
+  if (isCancel(wants)) { cancel("Cancelado"); process.exit(0); }
+  if (!wants) return undefined;
+
+  const type = await select({
+    message: "Tipo de túnel:",
+    options: [
+      { value: "ssh", label: "Túnel SSH (bastion)", hint: "port-forward via host SSH" },
+      { value: "socks", label: "Proxy SOCKS5", hint: "socks5://host:1080" },
+      { value: "http", label: "Proxy HTTP CONNECT", hint: "http://host:8080" },
+      { value: "command", label: "Comando externo", hint: "cloud-sql-proxy, aws ssm..." },
+    ],
+    initialValue: existing?.type ?? "ssh"
+  }) as string;
+  if (isCancel(type)) { cancel("Cancelado"); process.exit(0); }
+
+  // Candidatos a env-ref (segredos do túnel) — preenchidos conforme o tipo.
+  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
+  const ask = async (msg: string, def = "") => {
+    const v = await text({ message: msg, defaultValue: def }) as string;
+    if (isCancel(v)) { cancel("Cancelado"); process.exit(0); }
+    return v;
+  };
+
+  let tunnel: any;
+
+  if (type === "ssh") {
+    const host = await ask("Host do bastion SSH:", existing?.host ?? "");
+    const portStr = await ask("Porta SSH:", String(existing?.port ?? 22));
+    const user = await ask("Usuário SSH:", existing?.user ?? "");
+    tunnel = { type: "ssh", host, port: Number(portStr) || 22, user };
+
+    const auth = await select({
+      message: "Autenticação SSH:",
+      options: [
+        { value: "keyfile", label: "Chave privada (arquivo)", hint: "caminho do .pem/id_rsa" },
+        { value: "keycontent", label: "Chave privada (conteúdo PEM)", hint: "colar a chave" },
+        { value: "password", label: "Senha SSH" },
+        { value: "agent", label: "ssh-agent", hint: "usa SSH_AUTH_SOCK" },
+      ]
+    }) as string;
+    if (isCancel(auth)) { cancel("Cancelado"); process.exit(0); }
+
+    if (auth === "keyfile") {
+      tunnel.privateKey = await ask("Caminho do arquivo da chave privada:", isRef(existing?.privateKey) ? "" : (existing?.privateKey ?? ""));
+      const pp = await promptPassword({ message: "Passphrase da chave (branco = sem):" }) as string;
+      if (isCancel(pp)) { cancel("Cancelado"); process.exit(0); }
+      if (pp) { tunnel.passphrase = pp; cand.push({ field: "TUNNEL_PASSPHRASE", val: pp, set: r => (tunnel.passphrase = r) }); }
+    } else if (auth === "keycontent") {
+      const pem = await ask("Cole o conteúdo PEM da chave privada:");
+      tunnel.privateKey = pem;
+      cand.push({ field: "TUNNEL_KEY", val: pem, set: r => (tunnel.privateKey = r) });
+      const pp = await promptPassword({ message: "Passphrase da chave (branco = sem):" }) as string;
+      if (isCancel(pp)) { cancel("Cancelado"); process.exit(0); }
+      if (pp) { tunnel.passphrase = pp; cand.push({ field: "TUNNEL_PASSPHRASE", val: pp, set: r => (tunnel.passphrase = r) }); }
+    } else if (auth === "password") {
+      const pw = await promptPassword({ message: "Senha SSH:" }) as string;
+      if (isCancel(pw)) { cancel("Cancelado"); process.exit(0); }
+      tunnel.password = pw;
+      cand.push({ field: "TUNNEL_PASS", val: pw, set: r => (tunnel.password = r) });
+    } else {
+      tunnel.agent = true;
+    }
+
+    const hk = await select({
+      message: "Verificação de host key do bastion:",
+      options: [
+        { value: "known", label: "known_hosts (recomendado)", hint: "~/.ssh/known_hosts" },
+        { value: "pin", label: "Pin de fingerprint", hint: "SHA256:..." },
+      ]
+    }) as string;
+    if (isCancel(hk)) { cancel("Cancelado"); process.exit(0); }
+    if (hk === "pin") tunnel.hostKey = await ask("Fingerprint SHA256 esperado do host:", existing?.hostKey ?? "");
+  } else if (type === "socks" || type === "http") {
+    const url = await ask(
+      `URL do proxy (ex: ${type === "socks" ? "socks5://user:senha@host:1080" : "http://user:senha@host:8080"}):`,
+      isRef(existing?.url) ? "" : (existing?.url ?? "")
+    );
+    tunnel = { type, url };
+    // URL pode conter credenciais → oferecer env-ref.
+    if (!isRef(url)) cand.push({ field: "TUNNEL_PROXY_URL", val: url, set: r => (tunnel.url = r) });
+  } else {
+    const command = await ask("Comando do túnel (binário):", existing?.command ?? "");
+    const argsStr = await ask("Argumentos (separados por espaço):", (existing?.args ?? []).join(" "));
+    const listenHost = await ask("Host local que o comando escuta:", existing?.listenHost ?? "127.0.0.1");
+    const listenPortStr = await ask("Porta local que o comando escuta:", String(existing?.listenPort ?? ""));
+    tunnel = {
+      type: "command",
+      command,
+      args: argsStr.trim() ? argsStr.trim().split(/\s+/) : [],
+      listenHost,
+      listenPort: Number(listenPortStr)
+    };
+  }
+
+  await offerEnvRefs(name, cand);
+  return tunnel;
 }
 
 // Opções compartilhadas pelos fluxos da TUI — com hint para dar contexto.
@@ -301,7 +428,7 @@ export async function runUninstaller() {
         if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
         if (dropEnv) {
           let target = "";
-          for (const [name, c] of Object.entries(conns)) target = removeEnvVars(name, c.engine ?? "oracle").target;
+          for (const [name, c] of Object.entries(conns)) target = removeEnvVars(name, c).target;
           const activate = process.platform === "win32" ? "Abra um novo terminal para refletir." : `Rode: source ${target}  (ou reabra o terminal).`;
           note([`Env vars removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
         }
@@ -432,7 +559,7 @@ export async function runConfigure() {
       if (isCancel(toDelete)) { cancel("Cancelado"); process.exit(0); }
       
       if (toDelete !== "back") {
-        const delEngine = connections[toDelete as string].engine;
+        const delConn = connections[toDelete as string];
         delete connections[toDelete as string];
         fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
         log.success(`Conexão '${toDelete}' excluída.`);
@@ -443,7 +570,7 @@ export async function runConfigure() {
         });
         if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
         if (dropEnv) {
-          const { target } = removeEnvVars(toDelete as string, delEngine);
+          const { target } = removeEnvVars(toDelete as string, delConn);
           const activate = process.platform === "win32"
             ? "Abra um novo terminal para refletir."
             : `Rode: source ${target}  (ou reabra o terminal).`;
@@ -513,12 +640,15 @@ export async function runConfigure() {
           connectString: editConnectString || connToEdit.connectString
         });
 
+        const editTunnel = await configureTunnel(toEdit as string, connToEdit.tunnel);
+
         connections[toEdit as string] = {
           engine: editEngine,
           user: editEngine === "postgres" ? "" : (userVal ?? ""),
           password: editEngine === "postgres" ? undefined : passVal,
           connectString: csVal,
-          thick: connToEdit.thick || false
+          thick: connToEdit.thick || false,
+          ...(editTunnel ? { tunnel: editTunnel } : {})
         };
 
         fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
@@ -573,12 +703,15 @@ export async function runConfigure() {
         connectString
       });
 
+      const newTunnel = await configureTunnel(connectionName as string);
+
       connections[connectionName as string] = {
         engine: engine,
         user: userVal ?? "",
         password: passVal,
         connectString: csVal,
-        thick: false
+        thick: false,
+        ...(newTunnel ? { tunnel: newTunnel } : {})
       };
 
       fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));

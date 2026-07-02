@@ -139,8 +139,55 @@ Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
 | `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; vazio (`[]`, default) = todos os schemas de usuário. Oracle: nomes em MAIÚSCULO (exclui os mantidos pela Oracle); Postgres: nomes como `public` (exclui `pg_*` e `information_schema`) |
+| `tunnel` | não | Túnel/proxy quando o banco só é acessível via bastion. Ver abaixo |
 
 O `cacheDir` não é configurável: é sempre `<pasta do connections.json>/types` (ex.: `.dba-master/types`).
+
+### Túnel / proxy (bancos em rede privada)
+
+Bancos acessíveis só via **bastion** aceitam um bloco `tunnel` por conexão. O
+`connectString` continua apontando para o **host:porta real** do banco — a camada
+de túnel abre o transporte, aloca uma porta local efêmera e reescreve a conexão
+por baixo (o driver disca no túnel, transparente). É **lazy**: o túnel só sobe
+quando a conexão é de fato usada, e conexões sem `tunnel` discam direto. Os
+segredos do túnel (chave/senha SSH, URL de proxy com credencial) usam a mesma
+indireção `${VAR}` — nada de segredo em texto plano no `connections.json`.
+
+Configurável pelos prompts de `npx -y dba-master@latest configure` (create/edit) ou à mão. Três tipos:
+
+**SSH (bastion)** — via lib `ssh2` (puro JS, cross-platform). Host key validado por
+`~/.ssh/known_hosts` por padrão (ou pin `hostKey` com fingerprint SHA256). Auth:
+chave por caminho **ou** conteúdo PEM (`privateKey`), `passphrase`, `password`, ou
+`agent: true` (usa `SSH_AUTH_SOCK`).
+
+```json
+"via_bastion": {
+  "engine": "postgres",
+  "connectString": "${DBA_PROD_CS}",
+  "tunnel": {
+    "type": "ssh", "host": "bastion.example.com", "port": 22,
+    "user": "${SSH_USER}", "privateKey": "${SSH_KEY_PATH}"
+  }
+}
+```
+
+**Proxy SOCKS5 / HTTP CONNECT** — `type: "socks"` ou `"http"`, com `url` (aceita credenciais embutidas):
+
+```json
+"tunnel": { "type": "socks", "url": "${PROXY_URL}" }   // socks5://user:senha@host:1080
+```
+
+**Comando externo** — delega o forward a um binário que escuta numa porta local (`cloud-sql-proxy`, `aws ssm`, `sshuttle`...). O dba-master só faz spawn, espera a porta abrir e mata no fim:
+
+```json
+"tunnel": {
+  "type": "command", "command": "cloud-sql-proxy",
+  "args": ["--port", "5432", "my-project:region:instance"],
+  "listenHost": "127.0.0.1", "listenPort": 5432
+}
+```
+
+> Oracle via túnel suporta EZConnect (`host:port/service`); TNS descriptor completo está fora de escopo.
 
 ### Gerar interfaces do schema
 

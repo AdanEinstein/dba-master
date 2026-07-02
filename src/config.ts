@@ -4,6 +4,32 @@ import { homedir } from "node:os";
 
 export const DEFAULT_POOL_MAX = 8;
 
+// Transporte opcional: quando o banco só é acessível via bastion/proxy, o driver
+// disca numa porta local que a camada tunnel/ encaminha até o destino real. Os
+// segredos (chave/senha SSH, credencial de proxy) seguem a mesma indireção ${VAR}
+// do resto do config — nunca ficam em texto claro no connections.json.
+export type TunnelConfig =
+  | {
+      type: "ssh";
+      host: string;
+      port?: number; // default 22
+      user: string;
+      privateKey?: string; // path do arquivo OU conteúdo PEM (${VAR})
+      passphrase?: string;
+      password?: string;
+      agent?: boolean; // usa SSH_AUTH_SOCK do ambiente
+      hostKey?: string; // pin de fingerprint SHA256 (fallback ao known_hosts)
+      knownHosts?: string; // path; default ~/.ssh/known_hosts
+    }
+  | { type: "socks" | "http"; url: string } // ex: socks5://user:pass@host:1080
+  | {
+      type: "command";
+      command: string;
+      args?: string[];
+      listenHost?: string; // default 127.0.0.1
+      listenPort: number; // onde o comando externo escuta
+    };
+
 export interface ConnectionConfig {
   engine: string;
   user: string;
@@ -14,6 +40,7 @@ export interface ConnectionConfig {
   poolMax?: number;
   readOnly?: boolean;
   schemaFilter?: string[];
+  tunnel?: TunnelConfig;
 }
 
 export interface Config {
@@ -34,6 +61,23 @@ function interpolateEnv(value: string, connName: string, field: string): string 
     }
     return v;
   });
+}
+
+// Interpola ${VAR} nos campos string do bloco tunnel (segredos SSH/proxy).
+function interpolateTunnel(t: TunnelConfig, connName: string): void {
+  if (t.type === "ssh") {
+    t.user = interpolateEnv(t.user, connName, "tunnel.user");
+    if (t.privateKey) t.privateKey = interpolateEnv(t.privateKey, connName, "tunnel.privateKey");
+    if (t.passphrase) t.passphrase = interpolateEnv(t.passphrase, connName, "tunnel.passphrase");
+    if (t.password) t.password = interpolateEnv(t.password, connName, "tunnel.password");
+    if (t.hostKey) t.hostKey = interpolateEnv(t.hostKey, connName, "tunnel.hostKey");
+    if (t.knownHosts) t.knownHosts = interpolateEnv(t.knownHosts, connName, "tunnel.knownHosts");
+  } else if (t.type === "command") {
+    t.command = interpolateEnv(t.command, connName, "tunnel.command");
+    if (t.args) t.args = t.args.map((a, i) => interpolateEnv(a, connName, `tunnel.args[${i}]`));
+  } else {
+    t.url = interpolateEnv(t.url, connName, "tunnel.url");
+  }
 }
 
 // Fonte única: connections.json (projeto ./.dba-master ou global ~/.dba-master).
@@ -69,6 +113,7 @@ export function loadConfig(): Config {
     if (c.password) c.password = interpolateEnv(c.password, name, "password");
     if (c.connectString) c.connectString = interpolateEnv(c.connectString, name, "connectString");
     if (c.clientLibDir) c.clientLibDir = interpolateEnv(c.clientLibDir, name, "clientLibDir");
+    if (c.tunnel) interpolateTunnel(c.tunnel, name);
     c.poolMax ??= DEFAULT_POOL_MAX;
     c.readOnly ??= true;
     c.schemaFilter ??= [];

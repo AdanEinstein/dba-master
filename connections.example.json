@@ -15,5 +15,23 @@
     "poolMax": 8,
     "readOnly": true,
     "schemaFilter": ["public"]
+  },
+  "via_bastion": {
+    "engine": "postgres",
+    "connectString": "${DBA_VIA_BASTION_CS}",
+    "tunnel": {
+      "type": "ssh",
+      "host": "bastion.example.com",
+      "port": 22,
+      "user": "${DBA_VIA_BASTION_TUNNEL_USER}",
+      "privateKey": "${DBA_VIA_BASTION_TUNNEL_KEY}"
+    }
+  },
+  "via_socks": {
+    "engine": "oracle",
+    "user": "${DBA_VIA_SOCKS_USER}",
+    "password": "${DBA_VIA_SOCKS_PASS}",
+    "connectString": "${DBA_VIA_SOCKS_CS}",
+    "tunnel": { "type": "socks", "url": "${DBA_VIA_SOCKS_TUNNEL_PROXY_URL}" }
   }
 }

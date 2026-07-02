@@ -24,6 +24,11 @@ src/
       pg-connection.ts              # pool node-postgres + query() (binds $1)
       pg-queries.ts                 # SQL information_schema/pg_catalog
       pg-provider.ts                # implements DatabaseProvider: query + transforma linha→DTO + typeToTs
+    tunnel/
+      index.ts                      # withTunnel + parse/rewrite de endpoint + factory createTunnel
+      ssh-tunnel.ts                 # bastion SSH via ssh2 (forwardOut + servidor local)
+      proxy-tunnel.ts               # relay p/ SOCKS5 (lib socks) ou HTTP CONNECT
+      command-tunnel.ts             # spawn de comando externo (lifecycle-only)
     schema-cache.ts                 # geração das interfaces .ts (DB-agnóstico)
     provider-manager.ts             # createProvider: switch(engine) → provider + gerencia conexões
   mcp/
