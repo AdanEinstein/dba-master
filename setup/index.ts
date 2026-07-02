@@ -287,7 +287,7 @@ export async function runConfigure() {
           message: "Selecione o motor de banco de dados (engine):",
           options: [
             { value: "oracle", label: "Oracle Database" },
-            { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+            { value: "postgres", label: "PostgreSQL" },
             { value: "mysql", label: "MySQL (Em breve)", disabled: true },
             { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
           ],
@@ -337,7 +337,7 @@ export async function runConfigure() {
         message: "Selecione o motor de banco de dados (engine):",
         options: [
           { value: "oracle", label: "Oracle Database" },
-          { value: "postgres", label: "PostgreSQL (Em breve)", disabled: true },
+          { value: "postgres", label: "PostgreSQL" },
           { value: "mysql", label: "MySQL (Em breve)", disabled: true },
           { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
         ]
