@@ -23,11 +23,11 @@ const COMMANDS: Command[] = [
     desc: "Engenharia reversa de banco legado: reconstrói FKs implícitas, cataloga PL/SQL e jobs, e entrega um mapa do schema",
   },
   {
-    cmd: "data-reprocessor",
+    cmd: "dba-reprocessor",
     desc: "Planeja reprocessamento/correção de dados em massa fundamentado na estrutura real do banco, via tools MCP do dba-master",
   },
   {
-    cmd: "data-script-gen",
+    cmd: "dba-script-gen",
     desc: "Gera SQL de reprocessamento (idempotente, transacional) no dialeto da conexão atual a partir da estrutura confirmada pelas tools do dba-master",
   },
 ];

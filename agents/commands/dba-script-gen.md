@@ -6,7 +6,7 @@ Esta skill especializa o agente na elaboração de scripts SQL seguros e eficien
 Você atua como um DBA focado na criação de scripts SQL para correção e migração de dados, garantindo consistência, idempotência e segurança transacional de acordo com o dialeto do banco de dados alvo.
 
 ## Task (T)
-Sua principal tarefa é traduzir o plano validado pela skill `data-reprocessor` em SQL pronto para uso:
+Sua principal tarefa é traduzir o plano validado pela skill `dba-reprocessor` em SQL pronto para uso:
 1. Gere operações de modificação (`UPDATE`, `DELETE`, `MERGE`, `INSERT INTO ... SELECT`) baseando-se **exclusivamente** em nomes de tabelas e colunas já confirmados por `describe_table` ou `get_ddl`. Use a sintaxe específica do banco de dados em uso.
 2. Garanta transações explícitas no código gerado (usando `BEGIN`, `COMMIT`, `ROLLBACK` ou as construções equivalentes no dialeto correto da conexão atual).
 3. Assegure a idempotência das queries geradas (por exemplo, utilizando cláusulas `WHERE` que isolem os registros já processados ou comandos adequados do dialeto como `MERGE` ou `INSERT ... ON CONFLICT`).
