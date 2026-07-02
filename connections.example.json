@@ -1,9 +1,9 @@
 {
   "my_conn": {
     "engine": "oracle",
-    "user": "meu_usuario",
-    "password": "minha_senha",
-    "connectString": "host:1521/service_name",
+    "user": "${DBA_MY_CONN_USER}",
+    "password": "${DBA_MY_CONN_PASS}",
+    "connectString": "${DBA_MY_CONN_CS}",
     "thick": false,
     "poolMax": 8,
     "readOnly": true,
@@ -11,7 +11,7 @@
   },
   "my_pg": {
     "engine": "postgres",
-    "connectString": "postgresql://usuario:senha@host:5432/meu_banco",
+    "connectString": "${DBA_MY_PG_CS}",
     "poolMax": 8,
     "readOnly": true,
     "schemaFilter": ["public"]

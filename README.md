@@ -7,6 +7,21 @@ para investigar o schema e propor soluções (queries, modelagem, diagnósticos)
 
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
+## 🔒 A IA não tem acesso às credenciais do banco
+
+**Nenhuma tool MCP retorna dados sensíveis de conexão.** `list_connections` devolve só os *nomes* das conexões — nunca `user`, `password` ou `connectString`. As credenciais são usadas apenas internamente para abrir o pool; o agente jamais as recebe no output das tools.
+
+Para fechar o último vetor — o agente conseguir **ler o `connections.json` em texto plano** —, qualquer campo aceita a referência `${NOME_DA_VAR}`, resolvida a partir das variáveis de ambiente no boot do server. Assim o segredo fica **fora do arquivo que o agente lê**, num env var que só o processo do servidor herda:
+
+```json
+{ "prod": { "engine": "oracle", "user": "${DBA_PROD_USER}",
+    "password": "${DBA_PROD_PASS}", "connectString": "${DBA_PROD_CS}" } }
+```
+
+O `configure`/`install` grava essas referências por padrão e pode **persistir as env vars no seu ambiente** (com sua permissão): `export` no `~/.zshrc`/`~/.bashrc` (Linux/macOS) ou `setx` no registro do usuário (Windows). Editar uma conexão atualiza as vars; excluí-la — ou rodar `uninstall` — remove-as.
+
+> É defesa **best-effort** contra leitura casual/acidental do agente. Um processo rodando com o mesmo usuário/shell ainda consegue ler o ambiente; para fronteira de segurança dura, use um keychain do SO ou isole o server em outro usuário/container.
+
 ## Bancos suportados
 
 O engine é escolhido pelo campo `engine` da conexão. Recursos exclusivos de um banco (packages PL/SQL e jobs agendados, por ex.) são expostos só onde existem — ver [Capability flag](#capability-flag).
@@ -81,15 +96,15 @@ npm run build                                                 # compila para dis
 
 ### Configuração Manual
 
-O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.json` localizado na pasta `.dba-master` (`./.dba-master/connections.json` no projeto — que tem precedência — ou `~/.dba-master/connections.json` global). Não há mais leitura de `.env` nem de variáveis de ambiente. O arquivo é um mapa plano `nomeDaConexao → objeto de conexão` (ver `connections.example.json`). Exemplo:
+O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.json` localizado na pasta `.dba-master` (`./.dba-master/connections.json` no projeto — que tem precedência — ou `~/.dba-master/connections.json` global). O arquivo é um mapa plano `nomeDaConexao → objeto de conexão` (ver `connections.example.json`). Qualquer campo string aceita a referência `${VAR}`, resolvida a partir das variáveis de ambiente no boot (ver [🔒 A IA não tem acesso às credenciais do banco](#-a-ia-não-tem-acesso-às-credenciais-do-banco)) — **recomendado para não deixar segredo em texto plano**. Exemplo:
 
 ```json
 {
   "prod": {
     "engine": "oracle",
-    "user": "system",
-    "password": "syspassword",
-    "connectString": "localhost:1521/ORCL",
+    "user": "${DBA_PROD_USER}",
+    "password": "${DBA_PROD_PASS}",
+    "connectString": "${DBA_PROD_CS}",
     "thick": false,
     "poolMax": 8,
     "readOnly": true,
@@ -97,14 +112,14 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
   },
   "pg": {
     "engine": "postgres",
-    "connectString": "postgresql://user:senha@localhost:5432/meu_banco",
+    "connectString": "${DBA_PG_CS}",
     "readOnly": true,
     "schemaFilter": ["public"]
   }
 }
 ```
 
-No Postgres, `user`/`password` podem vir embutidos na URL da `connectString` (como no exemplo `pg` acima) ou informados nos campos próprios.
+Os valores também podem ser gravados em texto plano direto no JSON (menos seguro). Se uma `${VAR}` referenciada não existir no ambiente, o server falha no boot nomeando a var. No Postgres, `user`/`password` vêm embutidos na URL da `connectString` (como no exemplo `pg` acima).
 
 Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
 

@@ -1,5 +1,6 @@
 import { intro, outro, note, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -18,6 +19,127 @@ const CONNECT_EXAMPLE: Record<string, string> = {
   sqlserver: "Server=localhost,1433;Database=db",
 };
 const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
+
+// Nome de env var a partir do nome da conexão: DBA_<CONN>_<CAMPO>.
+const envVarName = (connName: string, field: string) =>
+  `DBA_${connName.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")}_${field}`;
+
+// Escapa valor p/ string entre aspas simples do shell POSIX.
+const sqEscape = (s: string) => s.replace(/'/g, `'\\''`);
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// rc do shell por $SHELL; fallback ~/.profile.
+function shellRcPath(): string {
+  const sh = process.env.SHELL ?? "";
+  if (sh.includes("zsh")) return resolve(homedir(), ".zshrc");
+  if (sh.includes("bash")) return resolve(homedir(), ".bashrc");
+  return resolve(homedir(), ".profile");
+}
+
+// true se o valor já é uma referência ${VAR} (não é plaintext a converter/persistir).
+const isRef = (s?: string): boolean => typeof s === "string" && /^\$\{\w+\}$/.test(s);
+// Tag que marca as linhas de uma conexão no rc, p/ upsert e remoção idempotentes.
+const rcTag = (connName: string) => `# dba-master:${connName}`;
+// Nomes de env var de uma conexão, por engine (postgres só tem CS na URL).
+const envVarsFor = (connName: string, engine: string) =>
+  (engine === "postgres" ? ["CS"] : ["USER", "PASS", "CS"]).map(f => envVarName(connName, f));
+
+// Upsert de env vars no ambiente do usuário. Windows: setx (registro). POSIX: uma
+// linha por var no rc, com tag da conexão; substitui a linha da var se já existe.
+function upsertEnvVars(connName: string, pairs: Array<[string, string]>): { target: string } {
+  if (process.platform === "win32") {
+    // ponytail: setx quebra se o valor tiver aspas duplas; raro em creds/URLs. Se virar problema, escapar.
+    for (const [v, val] of pairs) execFileSync("setx", [v, val]);
+    return { target: "ambiente do usuário (setx) — abra um novo terminal" };
+  }
+  const rc = shellRcPath();
+  const tag = rcTag(connName);
+  let lines = fs.existsSync(rc) ? fs.readFileSync(rc, "utf8").split("\n") : [];
+  for (const [v, val] of pairs) {
+    lines = lines.filter(l => !new RegExp(`^\\s*export ${escapeRe(v)}=`).test(l));
+    lines.push(`export ${v}='${sqEscape(val)}' ${tag}`);
+  }
+  fs.writeFileSync(rc, lines.join("\n").replace(/\n+$/, "") + "\n");
+  return { target: rc };
+}
+
+// Remove do ambiente do usuário as env vars de uma conexão. Windows: reg delete por
+// nome (ignora ausentes). POSIX: dropa toda linha marcada com a tag da conexão.
+function removeEnvVars(connName: string, engine: string): { target: string } {
+  if (process.platform === "win32") {
+    for (const v of envVarsFor(connName, engine)) {
+      try { execFileSync("reg", ["delete", "HKCU\\Environment", "/v", v, "/f"], { stdio: "ignore" }); }
+      catch { /* var não existia — ok */ }
+    }
+    return { target: "ambiente do usuário (reg delete) — abra um novo terminal" };
+  }
+  const rc = shellRcPath();
+  if (!fs.existsSync(rc)) return { target: rc };
+  const tag = rcTag(connName);
+  const kept = fs.readFileSync(rc, "utf8").split("\n").filter(l => !l.trimEnd().endsWith(tag));
+  fs.writeFileSync(rc, kept.join("\n").replace(/\n+$/, "") + "\n");
+  return { target: rc };
+}
+
+// Fluxo interativo de env-refs p/ uma conexão (create/edit): pergunta se guarda como
+// referência e se persiste; só converte/persiste campos com plaintext novo (refs
+// existentes ficam intactas). Devolve os valores a gravar no connections.json.
+async function applyEnvRefs(
+  name: string,
+  engine: string,
+  vals: { user?: string; password?: string; connectString: string }
+): Promise<{ userVal?: string; passVal?: string; csVal: string }> {
+  let userVal = vals.user;
+  let passVal = vals.password;
+  let csVal = vals.connectString;
+
+  // Candidatos: campos com plaintext (não vazio e ainda não são ${...}).
+  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
+  if (engine !== "postgres" && userVal && !isRef(userVal)) cand.push({ field: "USER", val: userVal, set: r => (userVal = r) });
+  if (engine !== "postgres" && passVal && !isRef(passVal)) cand.push({ field: "PASS", val: passVal, set: r => (passVal = r) });
+  if (csVal && !isRef(csVal)) cand.push({ field: "CS", val: csVal, set: r => (csVal = r) });
+  if (cand.length === 0) return { userVal, passVal, csVal };
+
+  const useEnvRefs = await confirm({
+    message: "Guardar credenciais como referência a env var? (recomendado — mantém o segredo fora do connections.json, que agentes de IA conseguem ler)",
+    initialValue: true
+  });
+  if (isCancel(useEnvRefs)) { cancel("Cancelado"); process.exit(0); }
+  if (!useEnvRefs) return { userVal, passVal, csVal };
+
+  const pairs: Array<[string, string]> = cand.map(c => {
+    const v = envVarName(name, c.field);
+    c.set(`\${${v}}`);
+    return [v, c.val];
+  });
+
+  const autoPersist = await confirm({
+    message: "Escrever essas env vars automaticamente no seu ambiente? (senão, mostro os comandos para colar)",
+    initialValue: false
+  });
+  if (isCancel(autoPersist)) { cancel("Cancelado"); process.exit(0); }
+
+  const isWin = process.platform === "win32";
+  if (autoPersist) {
+    const { target } = upsertEnvVars(name, pairs);
+    const activate = isWin ? "Abra um novo terminal para valerem." : `Rode: source ${target}  (ou reabra o terminal).`;
+    note(
+      [`${pairs.length} env var(s) gravadas em: ${target}`, "", activate,
+       "Aviso: o segredo fica em texto plano nesse destino — para proteção forte, use um keychain."].join("\n"),
+      "Env vars persistidas"
+    );
+  } else {
+    const cmds = pairs.map(([v, val]) => (isWin ? `setx ${v} "${val}"` : `export ${v}='${sqEscape(val)}'`));
+    const hint = isWin
+      ? "Rode no PowerShell/cmd (setx persiste p/ novos terminais) e reabra o terminal."
+      : "Cole no seu ~/.zshrc ou ~/.bashrc e reinicie o shell.";
+    note(
+      [...cmds, "", hint, "O connections.json guardará apenas as referências ${...}."].join("\n"),
+      "Adicione estas env vars ao seu ambiente"
+    );
+  }
+  return { userVal, passVal, csVal };
+}
 
 // Opções compartilhadas pelos fluxos da TUI — com hint para dar contexto.
 const AGENT_OPTIONS = [
@@ -164,6 +286,31 @@ export async function runUninstaller() {
     }
   }
 
+  // Remover env vars persistidas das conexões — antes de apagar o connections.json.
+  const scopeDir = isGlobal ? resolve(homedir(), ".dba-master") : resolve(process.cwd(), ".dba-master");
+  const scopeJson = resolve(scopeDir, "connections.json");
+  if (fs.existsSync(scopeJson)) {
+    try {
+      const conns = JSON.parse(fs.readFileSync(scopeJson, "utf8")) as Record<string, { engine?: string }>;
+      const names = Object.keys(conns);
+      if (names.length > 0) {
+        const dropEnv = await confirm({
+          message: `Remover também as env vars persistidas de ${names.length} conexão(ões) do seu ambiente?`,
+          initialValue: true
+        });
+        if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
+        if (dropEnv) {
+          let target = "";
+          for (const [name, c] of Object.entries(conns)) target = removeEnvVars(name, c.engine ?? "oracle").target;
+          const activate = process.platform === "win32" ? "Abra um novo terminal para refletir." : `Rode: source ${target}  (ou reabra o terminal).`;
+          note([`Env vars removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
+        }
+      }
+    } catch (e) {
+      log.warn(`Falha ao remover env vars: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (confirmDelete) {
     const dbaMasterDir = isGlobal
       ? resolve(homedir(), ".dba-master")
@@ -285,9 +432,23 @@ export async function runConfigure() {
       if (isCancel(toDelete)) { cancel("Cancelado"); process.exit(0); }
       
       if (toDelete !== "back") {
+        const delEngine = connections[toDelete as string].engine;
         delete connections[toDelete as string];
         fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
         log.success(`Conexão '${toDelete}' excluída.`);
+
+        const dropEnv = await confirm({
+          message: "Remover também as env vars desta conexão do seu ambiente?",
+          initialValue: true
+        });
+        if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
+        if (dropEnv) {
+          const { target } = removeEnvVars(toDelete as string, delEngine);
+          const activate = process.platform === "win32"
+            ? "Abra um novo terminal para refletir."
+            : `Rode: source ${target}  (ou reabra o terminal).`;
+          note([`Env vars da conexão '${toDelete}' removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
+        }
       }
     }
 
@@ -343,11 +504,20 @@ export async function runConfigure() {
         }) as string;
         if (isCancel(editConnectString)) { cancel("Cancelado"); process.exit(0); }
 
-        connections[toEdit as string] = {
-          engine: editEngine,
+        // Branco = mantém o valor atual (inclusive se já for uma ref ${...}).
+        // ponytail: troca de engine pode deixar env var órfã (ex: USER/PASS ao virar
+        // postgres); export não-usado é inofensivo, ignoramos.
+        const { userVal, passVal, csVal } = await applyEnvRefs(toEdit as string, editEngine, {
           user: editEngine === "postgres" ? "" : (editDbUser || connToEdit.user),
           password: editEngine === "postgres" ? undefined : (editDbPassword || connToEdit.password),
-          connectString: editConnectString || connToEdit.connectString,
+          connectString: editConnectString || connToEdit.connectString
+        });
+
+        connections[toEdit as string] = {
+          engine: editEngine,
+          user: editEngine === "postgres" ? "" : (userVal ?? ""),
+          password: editEngine === "postgres" ? undefined : passVal,
+          connectString: csVal,
           thick: connToEdit.thick || false
         };
 
@@ -397,11 +567,17 @@ export async function runConfigure() {
       }) as string;
       if (isCancel(connectString)) { cancel("Cancelado"); process.exit(0); }
 
-      connections[connectionName as string] = {
-        engine: engine,
+      const { userVal, passVal, csVal } = await applyEnvRefs(connectionName as string, engine, {
         user: dbUser,
         password: dbPassword || undefined,
-        connectString: connectString,
+        connectString
+      });
+
+      connections[connectionName as string] = {
+        engine: engine,
+        user: userVal ?? "",
+        password: passVal,
+        connectString: csVal,
         thick: false
       };
 

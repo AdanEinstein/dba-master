@@ -3,8 +3,13 @@
 Todas as tools retornam **JSON estruturado** (em `content[].text`), pensado para consumo
 por outro agente de IA — não para leitura humana direta.
 
+> **Segurança:** nenhuma tool retorna credenciais. `list_connections` devolve só os *nomes*
+> das conexões — nunca `user`, `password` ou `connectString`. Segredos ficam fora do output
+> das tools e, com `${VAR}`, fora do próprio `connections.json`.
+
 | Tool | O que faz | Parâmetros |
 |---|---|---|
+| `list_connections` | Lista os **nomes** das conexões mapeadas (sem credenciais) | - |
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
 | `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera a interface `.ts` em cache | `table`, `schema?` |

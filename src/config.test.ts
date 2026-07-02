@@ -54,4 +54,25 @@ describe("loadConfig — connections.json como fonte única", () => {
     assert.strictEqual(connections.prod.readOnly, false);
     assert.deepStrictEqual(connections.prod.schemaFilter, ["APP"]);
   });
+
+  test("interpola ${VAR} nos campos sensíveis a partir de process.env", () => {
+    process.env.DBA_TEST_PASS = "s3cr3t";
+    process.env.DBA_TEST_CS = "host:1521/svc";
+    sandbox({
+      dev: { engine: "oracle", user: "u", password: "${DBA_TEST_PASS}", connectString: "${DBA_TEST_CS}" },
+    });
+    const { connections } = loadConfig();
+    assert.strictEqual(connections.dev.password, "s3cr3t");
+    assert.strictEqual(connections.dev.connectString, "host:1521/svc");
+    delete process.env.DBA_TEST_PASS;
+    delete process.env.DBA_TEST_CS;
+  });
+
+  test("env var referenciada e ausente lança erro nomeando a var", () => {
+    delete process.env.DBA_MISSING;
+    sandbox({
+      dev: { engine: "oracle", user: "u", password: "${DBA_MISSING}", connectString: "host/svc" },
+    });
+    assert.throws(() => loadConfig(), /DBA_MISSING/);
+  });
 });
