@@ -27,6 +27,18 @@ const stub = {
   getRelationships: async (table: string, schema?: string): Promise<Relationships> => ({
     owner: schema ?? "HR", tableName: table, outgoing: [], incoming: [],
   }),
+  getSchemaInventory: async () => ({
+    columns: [
+      { owner: "HR", table: "EMPLOYEES", column: "ID", dataType: "NUMBER" },
+      { owner: "HR", table: "EMPLOYEES", column: "DEPARTMENT_ID", dataType: "NUMBER" },
+      { owner: "HR", table: "DEPARTMENTS", column: "ID", dataType: "NUMBER" },
+    ],
+    primaryKeys: [
+      { owner: "HR", table: "EMPLOYEES", column: "ID" },
+      { owner: "HR", table: "DEPARTMENTS", column: "ID" },
+    ],
+    declaredFkColumns: [],
+  }),
   listViews: async (): Promise<ViewRef[]> => [{ owner: "HR", viewName: "EMP_VIEW" }],
   describeView: async (view: string, schema?: string): Promise<ViewSchema> => {
     (stub as any).describeViewCalls = ((stub as any).describeViewCalls || 0) + 1;
@@ -50,6 +62,8 @@ const empSrc = readFileSync(join(dir, "test_conn", "HR", "EMPLOYEES.ts"), "utf8"
 assert.match(empSrc, /export interface Employees {/);
 assert.match(empSrc, /\/\/ hash: /);
 assert.match(empSrc, /FK → HR\.DEPARTMENTS/);
+// FK implícita inferida (DEPARTMENT_ID → DEPARTMENTS.ID) refletida no cache.
+assert.match(empSrc, /FK implícita \(inferida\) → HR\.DEPARTMENTS\.ID/);
 assert.match(readFileSync(join(dir, "test_conn", "HR", "EMP_VIEW.ts"), "utf8"), /\/\/ kind: view/);
 
 // includeViews:false pula views

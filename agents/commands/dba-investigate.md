@@ -35,3 +35,4 @@ comece estreito para não afogar o contexto.
 - Aponte riscos: FKs de entrada afetadas, índices ausentes para o filtro proposto,
   colunas anuláveis que exigem tratamento.
 - Se faltar informação, diga qual tool rodar em seguida — não invente estrutura.
+- Antes de fechar, passe pelo gate `dba-wiring`: cada afirmação precisa ter origem em tool.

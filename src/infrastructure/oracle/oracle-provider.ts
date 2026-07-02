@@ -3,7 +3,7 @@ import type { Capabilities, DatabaseProvider } from "../../domain/database-provi
 import type {
   TableRef, TableSchema, ViewRef, ViewSchema, Relationships, DdlResult,
   ProcedureRef, PackageRef, ScheduledJob, RunSqlResult,
-  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo, CheckConstraint,
+  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo, CheckConstraint, SchemaInventory,
 } from "../../domain/types.js";
 import { OracleConnection } from "./oracle-connection.js";
 import { OracleQueries, type ColumnRow, type FkRow, type IndexRow, type CheckRow } from "./oracle-queries.js";
@@ -72,6 +72,19 @@ export class OracleProvider implements DatabaseProvider {
     const outgoing = groupOutgoing(await this.q.findOutgoingFks(owner, tab));
     const incoming = groupIncoming(await this.q.findIncomingFks(owner, tab));
     return { owner, tableName: tab, outgoing, incoming };
+  }
+
+  async getSchemaInventory(schema?: string): Promise<SchemaInventory> {
+    const [cols, pks, fks] = await Promise.all([
+      this.q.inventoryColumns(schema),
+      this.q.inventoryKeyColumns("P", schema),
+      this.q.inventoryKeyColumns("R", schema),
+    ]);
+    return {
+      columns: cols.map((r) => ({ owner: r.OWNER, table: r.TABLE_NAME, column: r.COLUMN_NAME, dataType: r.DATA_TYPE })),
+      primaryKeys: pks.map((r) => ({ owner: r.OWNER, table: r.TABLE_NAME, column: r.COLUMN_NAME })),
+      declaredFkColumns: fks.map((r) => ({ owner: r.OWNER, table: r.TABLE_NAME, column: r.COLUMN_NAME })),
+    };
   }
 
   async listViews(schema?: string, pattern?: string): Promise<ViewRef[]> {

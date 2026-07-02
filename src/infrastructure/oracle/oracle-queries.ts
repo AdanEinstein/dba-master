@@ -191,6 +191,30 @@ export class OracleQueries {
     );
   }
 
+  /** Todas as colunas do schema (inventário p/ inferência de FK implícita). */
+  inventoryColumns(schema?: string): Promise<{ OWNER: string; TABLE_NAME: string; COLUMN_NAME: string; DATA_TYPE: string }[]> {
+    const oc = this.ownerClause("c", schema);
+    return this.conn.query(
+      `SELECT c.owner, c.table_name, c.column_name, c.data_type
+         FROM all_tab_columns c
+        WHERE ${oc.sql}`,
+      oc.binds,
+    );
+  }
+
+  /** Colunas de PK (type 'P') e FK declarada (type 'R') do schema, conforme constraintType. */
+  inventoryKeyColumns(constraintType: "P" | "R", schema?: string): Promise<{ OWNER: string; TABLE_NAME: string; COLUMN_NAME: string }[]> {
+    const oc = this.ownerClause("c", schema);
+    return this.conn.query(
+      `SELECT c.owner, c.table_name, cc.column_name
+         FROM all_constraints c
+         JOIN all_cons_columns cc
+           ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name
+        WHERE ${oc.sql} AND c.constraint_type = :ctype`,
+      { ...oc.binds, ctype: constraintType },
+    );
+  }
+
   findIndexes(owner: string, table: string): Promise<IndexRow[]> {
     return this.conn.query<IndexRow>(
       `SELECT i.index_name, i.uniqueness, ic.column_name

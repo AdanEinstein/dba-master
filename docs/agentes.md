@@ -15,7 +15,11 @@ npx -y dba-master@latest install
 Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
 (`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
 (`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
-O workflow interativo de skill `dba-investigate` também será posicionado nos diretórios de configuração apropriados para o agente escolhido.
+As skills `dba-investigate`, `dba-wiring` e `dba-legacy-map` também serão posicionadas nos diretórios de configuração apropriados para o agente escolhido:
+
+- `dba-investigate` — investiga o schema (do estreito ao amplo) e propõe queries/modelagem/diagnóstico.
+- `dba-legacy-map` — engenharia reversa de banco legado: reconstrói FKs implícitas (`infer_relationships`), cataloga PL/SQL e jobs, entrega um mapa do schema.
+- `dba-wiring` — gate de verificação: garante que toda entrega esteja ancorada em output real das tools (nada chutado).
 
 No Claude Code, alternativamente via CLI (Apenas servidor MCP — credenciais no `connections.json`, via `npx -y dba-master@latest configure`):
 

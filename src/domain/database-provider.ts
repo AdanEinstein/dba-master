@@ -9,6 +9,7 @@ import type {
   PackageRef,
   ScheduledJob,
   RunSqlResult,
+  SchemaInventory,
 } from "./types.js";
 
 // PORT (hexagonal): contrato que todo banco deve implementar. Tools e domínio
@@ -37,6 +38,8 @@ export interface DatabaseProvider {
   /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */
   describeTable(table: string, schema?: string): Promise<TableSchema>;
   getRelationships(table: string, schema?: string): Promise<Relationships>;
+  /** Inventário do schema (colunas, PKs, FKs declaradas) p/ inferir FK implícita em legado. */
+  getSchemaInventory(schema?: string): Promise<SchemaInventory>;
   /** Lista views (owner, nome), opcionalmente filtrando por substring do nome. */
   listViews(schema?: string, pattern?: string): Promise<ViewRef[]>;
   /** Descreve a view: colunas + o SELECT que a define. */

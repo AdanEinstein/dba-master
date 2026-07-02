@@ -7,60 +7,73 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const CMD = "dba-investigate";
-const DESC =
-  "Investiga o schema de um banco via tools MCP do dba-master e propõe soluções (queries, modelagem, diagnóstico)";
+// Skills/comandos que o dba-master instala nos agentes. Fonte do corpo: agents/commands/.
+interface Command { cmd: string; desc: string }
+const COMMANDS: Command[] = [
+  {
+    cmd: "dba-investigate",
+    desc: "Investiga o schema de um banco via tools MCP do dba-master e propõe soluções (queries, modelagem, diagnóstico)",
+  },
+  {
+    cmd: "dba-wiring",
+    desc: "Gate de verificação: garante que toda entrega sobre banco esteja ancorada em output real das tools do dba-master (nada chutado)",
+  },
+  {
+    cmd: "dba-legacy-map",
+    desc: "Engenharia reversa de banco legado: reconstrói FKs implícitas, cataloga PL/SQL e jobs, e entrega um mapa do schema",
+  },
+];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-const agentPathDev = resolve(HERE, "..", "agents", "commands", `${CMD}.md`);
-const agentPathProd = resolve(HERE, "..", "..", "agents", "commands", `${CMD}.md`);
-const bodyPath = existsSync(agentPathDev) ? agentPathDev : agentPathProd;
-
-const body = () => readFileSync(bodyPath, "utf8");
+function body(cmd: string): string {
+  const dev = resolve(HERE, "..", "agents", "commands", `${cmd}.md`);
+  const prod = resolve(HERE, "..", "..", "agents", "commands", `${cmd}.md`);
+  return readFileSync(existsSync(dev) ? dev : prod, "utf8");
+}
 
 function write(dest: string, content: string): void {
   mkdirSync(dirname(dest), { recursive: true });
   writeFileSync(dest, content);
 }
 
-const withFm = (dest: string) => write(dest, `---\ndescription: ${DESC}\n---\n\n${body()}`);
-const withSkill = (dest: string) =>
-  write(dest, `---\nname: ${CMD}\ndescription: ${DESC}\n---\n\n${body()}`);
+const withFm = (dest: string, c: Command) => write(dest, `---\ndescription: ${c.desc}\n---\n\n${body(c.cmd)}`);
+const withSkill = (dest: string, c: Command) =>
+  write(dest, `---\nname: ${c.cmd}\ndescription: ${c.desc}\n---\n\n${body(c.cmd)}`);
 
-const AGENTS: Record<string, (global: boolean) => void> = {
-  claude(global) {
+const AGENTS: Record<string, (c: Command, global: boolean) => void> = {
+  claude(c, global) {
     const base = global ? homedir() : process.cwd();
-    const dest = join(base, ".claude", "commands", `${CMD}.md`);
-    withFm(dest);
+    const dest = join(base, ".claude", "commands", `${c.cmd}.md`);
+    withFm(dest, c);
     console.log(`✓ Claude Code  → ${dest}`);
   },
-  copilot(global) {
+  copilot(c, global) {
     const base = global ? homedir() : process.cwd();
-    const dest = join(base, ".copilot", "skills", CMD, "SKILL.md");
-    withSkill(dest);
+    const dest = join(base, ".copilot", "skills", c.cmd, "SKILL.md");
+    withSkill(dest, c);
     console.log(`✓ Copilot      → ${dest}  (skill pessoal, não slash command)`);
   },
-  opencode(global) {
-    const dest = global 
-      ? join(homedir(), ".config", "opencode", "command", `${CMD}.md`)
-      : join(process.cwd(), ".opencode", "command", `${CMD}.md`);
-    withFm(dest);
+  opencode(c, global) {
+    const dest = global
+      ? join(homedir(), ".config", "opencode", "command", `${c.cmd}.md`)
+      : join(process.cwd(), ".opencode", "command", `${c.cmd}.md`);
+    withFm(dest, c);
     console.log(`✓ Opencode     → ${dest}`);
   },
-  antigravity(global) {
+  antigravity(c, global) {
     if (global) {
-      const destGlobal = join(homedir(), ".gemini", "antigravity-cli", "skills", CMD, "SKILL.md");
-      const destShared = join(homedir(), ".gemini", "skills", CMD, "SKILL.md");
+      const destGlobal = join(homedir(), ".gemini", "antigravity-cli", "skills", c.cmd, "SKILL.md");
+      const destShared = join(homedir(), ".gemini", "skills", c.cmd, "SKILL.md");
 
-      withSkill(destGlobal);
+      withSkill(destGlobal, c);
       console.log(`✓ Antigravity (Global)    → ${destGlobal}`);
 
-      withSkill(destShared);
+      withSkill(destShared, c);
       console.log(`✓ Antigravity (Shared)    → ${destShared}`);
     } else {
-      const destWorkspace = join(process.cwd(), ".agents", "skills", CMD, "SKILL.md");
-      withSkill(destWorkspace);
+      const destWorkspace = join(process.cwd(), ".agents", "skills", c.cmd, "SKILL.md");
+      withSkill(destWorkspace, c);
       console.log(`✓ Antigravity (Workspace) → ${destWorkspace}`);
     }
   },
@@ -77,8 +90,8 @@ export function installAgents(argv: string[]): void {
     console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(AGENTS).join(", ")}.`);
     process.exit(1);
   }
-  for (const t of targets) AGENTS[t](isGlobal);
-  console.log(`Pronto. Reabra/recarregue o agente para ele reindexar o comando (${isGlobal ? "global" : "project scoped"}).`);
+  for (const t of targets) for (const c of COMMANDS) AGENTS[t](c, isGlobal);
+  console.log(`Pronto. Reabra/recarregue o agente para ele reindexar os comandos (${isGlobal ? "global" : "project scoped"}).`);
 }
 
 function removeFile(file: string) {
@@ -95,27 +108,27 @@ function removeDir(dir: string) {
   }
 }
 
-const UNINSTALL_AGENTS_SKILL: Record<string, (global: boolean) => void> = {
-  claude(global) {
+const UNINSTALL_AGENTS_SKILL: Record<string, (cmd: string, global: boolean) => void> = {
+  claude(cmd, global) {
     const base = global ? homedir() : process.cwd();
-    removeFile(join(base, ".claude", "commands", `${CMD}.md`));
+    removeFile(join(base, ".claude", "commands", `${cmd}.md`));
   },
-  copilot(global) {
+  copilot(cmd, global) {
     const base = global ? homedir() : process.cwd();
-    removeDir(join(base, ".copilot", "skills", CMD));
+    removeDir(join(base, ".copilot", "skills", cmd));
   },
-  opencode(global) {
-    const dest = global 
-      ? join(homedir(), ".config", "opencode", "command", `${CMD}.md`)
-      : join(process.cwd(), ".opencode", "command", `${CMD}.md`);
+  opencode(cmd, global) {
+    const dest = global
+      ? join(homedir(), ".config", "opencode", "command", `${cmd}.md`)
+      : join(process.cwd(), ".opencode", "command", `${cmd}.md`);
     removeFile(dest);
   },
-  antigravity(global) {
+  antigravity(cmd, global) {
     if (global) {
-      removeDir(join(homedir(), ".gemini", "antigravity-cli", "skills", CMD));
-      removeDir(join(homedir(), ".gemini", "skills", CMD));
+      removeDir(join(homedir(), ".gemini", "antigravity-cli", "skills", cmd));
+      removeDir(join(homedir(), ".gemini", "skills", cmd));
     } else {
-      removeDir(join(process.cwd(), ".agents", "skills", CMD));
+      removeDir(join(process.cwd(), ".agents", "skills", cmd));
     }
   },
 };
@@ -130,5 +143,5 @@ export function uninstallAgents(argv: string[]): void {
     console.error(`Agente desconhecido: ${unknown.join(", ")}. Válidos: ${Object.keys(UNINSTALL_AGENTS_SKILL).join(", ")}.`);
     process.exit(1);
   }
-  for (const t of targets) UNINSTALL_AGENTS_SKILL[t](isGlobal);
+  for (const t of targets) for (const c of COMMANDS) UNINSTALL_AGENTS_SKILL[t](c.cmd, isGlobal);
 }

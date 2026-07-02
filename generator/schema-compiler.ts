@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseProvider } from "../src/domain/database-provider.js";
 import { writeTableCache } from "../src/infrastructure/schema-cache.js";
+import { inferImplicitFks } from "../src/domain/infer-relationships.js";
+import type { ImpliedRelationship } from "../src/domain/types.js";
 import { DEFAULT_POOL_MAX } from "../src/config.js";
 
 // Compila em lote: varre tabelas (e views) do schema e gera/atualiza as interfaces .ts.
@@ -56,6 +58,17 @@ export async function generateInterfaces(
   const typeToTs = db.typeToTs.bind(db);
   const poolMax = opts.poolMax ?? DEFAULT_POOL_MAX; // Limite de concorrência
 
+  // FKs implícitas: 1 varredura do schema inteiro, agrupada por tabela de origem.
+  // ponytail: degrada p/ vazio se o inventário falhar — não derruba o generate inteiro.
+  const impliedByTable = new Map<string, ImpliedRelationship[]>();
+  try {
+    for (const r of inferImplicitFks(await db.getSchemaInventory(opts.schema))) {
+      const key = r.from.split(".").slice(0, -1).join("."); // OWNER.TABLE
+      (impliedByTable.get(key) ?? impliedByTable.set(key, []).get(key)!).push(r);
+    }
+  } catch (e) {
+    errors.push({ name: "infer_relationships", error: msg(e) });
+  }
 
   let tables = 0;
   await mapPool(tableRefs, poolMax, async (t) => {
@@ -73,6 +86,7 @@ export async function generateInterfaces(
         primaryKey: s.primaryKey,
         foreignKeys: s.foreignKeys,
         incoming,
+        impliedForeignKeys: impliedByTable.get(`${s.owner}.${s.tableName}`),
         checkConstraints: s.checkConstraints,
         indexes: s.indexes,
       };

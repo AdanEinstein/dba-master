@@ -87,6 +87,41 @@ export interface Relationships {
   incoming: ForeignKey[];
 }
 
+// --- FK implícita (banco legado sem constraints declaradas) --------------
+
+/** Coluna qualquer do schema (inventário para inferência de FK). */
+export interface SchemaColumn {
+  owner: string;
+  table: string;
+  column: string;
+  dataType: string;
+}
+
+/** Coluna que participa de uma PK ou de uma FK declarada. */
+export interface SchemaKeyColumn {
+  owner: string;
+  table: string;
+  column: string;
+}
+
+/** Inventário de um schema: base da heurística de FK implícita (DB-agnóstico). */
+export interface SchemaInventory {
+  columns: SchemaColumn[];
+  primaryKeys: SchemaKeyColumn[];
+  /** Colunas já cobertas por uma FK declarada — excluídas da inferência. */
+  declaredFkColumns: SchemaKeyColumn[];
+}
+
+/** Candidato a FK implícita detectado por convenção de nome. */
+export interface ImpliedRelationship {
+  /** "OWNER.TABLE.COLUMN" da coluna candidata. */
+  from: string;
+  /** "OWNER.TABLE.PKCOLUMN" da tabela alvo. */
+  to: string;
+  confidence: "high" | "medium";
+  evidence: string;
+}
+
 // --- Modelos de PL/SQL ---------------------------------------------------
 
 export interface ArgumentInfo {
@@ -156,6 +191,8 @@ export interface InterfaceMeta {
   primaryKey?: string[];
   foreignKeys?: ForeignKey[]; // saída (esta tabela → outra)
   incoming?: ForeignKey[]; // entrada (outra tabela → esta)
+  /** FKs implícitas inferidas por nome (banco legado) cuja origem é esta tabela. */
+  impliedForeignKeys?: ImpliedRelationship[];
   checkConstraints?: CheckConstraint[];
   indexes?: IndexInfo[];
 }
@@ -188,6 +225,12 @@ export function generateInterface(
     });
   }
 
+  // Mapa coluna → FK implícita (inferida por nome), para anotar a coluna.
+  const colToImplied = new Map<string, ImpliedRelationship>();
+  for (const r of meta.impliedForeignKeys ?? []) {
+    colToImplied.set(r.from.split(".").pop() ?? "", r);
+  }
+
   const lines = columns.map((c) => {
     const tsType = typeToTs(c.dataType);
     const key = IDENT.test(c.name) ? c.name : JSON.stringify(c.name);
@@ -197,6 +240,8 @@ export function generateInterface(
     if (c.comment) parts.push(safeComment(c.comment));
     const fk = colToFk.get(c.name);
     if (fk) parts.push(`FK → ${fk}`);
+    const implied = colToImplied.get(c.name);
+    if (implied) parts.push(`FK? → ${implied.to} (implícita, ${implied.confidence})`);
     return `  /** ${parts.join(" — ")} */\n  ${key}${opt}: ${tsType}${nul};`;
   });
 
@@ -216,6 +261,9 @@ export function generateInterface(
   for (const fk of meta.incoming ?? []) {
     // incoming: fk.referenced* é ESTA tabela; fk.columns/table são a tabela filha.
     doc.push(`referenciada por ← ${fk.referencedOwner}.${fk.referencedTable} (${fk.columns.join(", ")} → ${fk.referencedColumns.join(", ")})`);
+  }
+  for (const r of meta.impliedForeignKeys ?? []) {
+    doc.push(`FK implícita (inferida) → ${r.to} [${r.confidence}: ${r.evidence}]`);
   }
   const docBlock = doc.length ? `/**\n${doc.map((l) => ` * ${l}`).join("\n")}\n */\n` : "";
 
