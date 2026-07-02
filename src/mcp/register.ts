@@ -18,6 +18,8 @@ import * as runSql from "./tools/run-sql.tool.js";
 import * as generateInterfaces from "./tools/generate-interfaces.tool.js";
 import * as monitor from "./tools/monitor.tool.js";
 import * as killSession from "./tools/kill-session.tool.js";
+import * as oraMonitor from "./tools/ora-monitor.tool.js";
+import * as oraKillSession from "./tools/ora-kill-session.tool.js";
 
 /** Registra todas as tools no servidor, injetando o provider (e config onde preciso). */
 export function registerTools(server: McpServer, provider: ProviderManager, cfg: Config): void {
@@ -37,4 +39,6 @@ export function registerTools(server: McpServer, provider: ProviderManager, cfg:
   generateInterfaces.register(server, provider, cfg);
   monitor.register(server, provider);
   killSession.register(server, provider, cfg);
+  oraMonitor.register(server, provider);
+  oraKillSession.register(server, provider, cfg);
 }

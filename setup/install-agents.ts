@@ -34,6 +34,10 @@ const COMMANDS: Command[] = [
     cmd: "dba-pg-monitor",
     desc: "Monitora e diagnostica Postgres (sessões, locks, vacuum, bloat, replicação) via pg_monitor; encerra sessões via pg_kill_session quando autorizado",
   },
+  {
+    cmd: "dba-ora-monitor",
+    desc: "Monitora e diagnostica Oracle (sessões, locks, top SQL, tablespace, cache, Data Guard) via ora_monitor; encerra sessões via ora_kill_session quando autorizado",
+  },
 ];
 
 const HERE = dirname(fileURLToPath(import.meta.url));

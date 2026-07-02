@@ -201,6 +201,8 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
 | `pg_monitor` | **Só Postgres, leitura.** Monitoramento: sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `READ_ONLY=false` | `pid`, `mode?` |
+| `ora_monitor` | **Só Oracle, leitura.** Monitoramento: sessões, locks, top SQL, tablespace, cache, índices, redo, Data Guard — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
+| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`; exige `READ_ONLY=false` + `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
 
 **Parâmetros comuns:**
 - **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
@@ -230,6 +232,22 @@ Lista completa dos `check` em [docs/tools.md](docs/tools.md).
 `pg_kill_session(pid, mode)` é a única ação destrutiva: `cancel` (reversível) ou `terminate`
 (ROLLBACK). Bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
 Para diagnósticos guiados, use o comando `/dba-pg-monitor`.
+
+### Monitoramento Oracle (`ora_monitor` / `ora_kill_session`)
+
+Exclusivas do engine Oracle. `ora_monitor` é somente leitura — cada `check` é um `SELECT`
+fixo sobre views `v$`/`dba_*` (exige `SELECT_CATALOG_ROLE`). Sem detecção de versão (views
+estáveis 12c–23c); colunas voltam em UPPERCASE; consulta só a instância local (`v$`).
+Escolha a métrica em `check`: atividade (`active_queries`, `long_transactions`), sessões
+(`connections_usage`, `idle_in_transaction`), locks (`blocking_locks`, `deadlocks`),
+`top_queries` (`orderBy` total/mean/io), storage (`tablespace_usage`, `table_sizes`,
+`stale_stats`), cache (`cache_hit`, `library_cache`), índices (`unused_indexes` 12.2+,
+`full_scans`), redo (`redo_stats`, `log_switches`) e Data Guard (`dataguard_stats`,
+`archive_dest`). Lista completa em [docs/tools.md](docs/tools.md).
+
+`ora_kill_session(sid, serial, mode)` é a única ação destrutiva: `cancel` (só o SQL, 19c+,
+reversível) ou `kill` (derruba a sessão, ROLLBACK). Exige `ALTER SYSTEM` e é bloqueada quando
+a conexão está `readOnly` (default). Para diagnósticos guiados, use o comando `/dba-ora-monitor`.
 
 ### Cache de tipos
 

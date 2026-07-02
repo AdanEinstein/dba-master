@@ -25,6 +25,8 @@ por outro agente de IA — não para leitura humana direta.
 | `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`, limita linhas | `sql`, `maxRows?` |
 | `pg_monitor` | **Só Postgres.** Monitoramento (leitura): sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação. Escolha a métrica em `check` (ver abaixo) | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `READ_ONLY=false` na conexão | `pid`, `mode?` |
+| `ora_monitor` | **Só Oracle.** Monitoramento (leitura): sessões, locks, top SQL, tablespace/segments, cache, índices, redo, Data Guard. Escolha a métrica em `check` (ver abaixo). Exige `SELECT_CATALOG_ROLE` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
+| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`. Exige `READ_ONLY=false` e `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
 
 ## Parâmetros comuns
 
@@ -67,6 +69,32 @@ Valores de `check`, por área:
 `pg_kill_session` é a única ação destrutiva: cancela (`mode: "cancel"`, `pg_cancel_backend`,
 reversível) ou derruba (`mode: "terminate"`, `pg_terminate_backend`, faz ROLLBACK) o backend
 do `pid`. Bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
+
+## Monitoramento Oracle (`ora_monitor` / `ora_kill_session`)
+
+Exclusivas do engine Oracle (retornam erro claro em Postgres). `ora_monitor` é somente
+leitura — cada `check` é um `SELECT` fixo sobre views `v$`/`dba_*`. Exige
+`SELECT_CATALOG_ROLE` (ou grants nas views); sem ele o Oracle devolve `ORA-00942` e o
+erro chega ao agente. Sem detecção de versão (as views são estáveis de 12c a 23c) e as
+colunas voltam em **UPPERCASE** (padrão Oracle). Consulta só a instância local (`v$`),
+não o cluster RAC (`gv$`).
+
+Valores de `check`, por área:
+
+- **Atividade:** `active_queries` (status ACTIVE agora), `all_activity` (todas as sessões `type=USER`), `long_transactions` (transações abertas mais antigas — seguram undo).
+- **Sessões:** `sessions_by_state`, `connections_by_source` (leak por program/machine/osuser), `connections_usage` (`v$resource_limit`: sessions/processes vs limite), `idle_in_transaction` (INACTIVE com transação aberta; aceita `idleMinutes`, default 5).
+- **Locks:** `blocking_locks` (blocked × blocking via `blocking_session`), `locks_detail` (`v$lock` por tipo/modo/objeto), `deadlocks` (contador cumulativo `enqueue deadlocks`).
+- **Queries:** `top_queries` (`v$sqlarea`). `orderBy` = `total` (elapsed agregado, default), `mean` (média por execução) ou `io` (buffer gets); `limit` (default 5).
+- **Storage:** `tablespace_usage` (used_pct), `segment_sizes` (maiores segmentos), `table_sizes` (tabelas + `num_rows`), `stale_stats` (estatísticas velhas — candidatas a `DBMS_STATS`).
+- **Cache:** `cache_hit` (buffer cache hit ratio), `library_cache` (`v$librarycache` get/pin hit).
+- **Índices:** `unused_indexes` (`dba_index_usage` sem acesso — exige 12.2+; nunca dropar PK/UNIQUE), `full_scans` (contadores de full table scan).
+- **Redo:** `redo_stats` (`redo size`/`writes`/`entries`), `log_switches` (frequência de switch por hora, análogo a checkpoint).
+- **Data Guard:** `dataguard_stats` (apply/transport lag), `archive_dest` (destinos de archive em erro).
+
+`ora_kill_session` é a única ação destrutiva: cancela só o SQL em curso (`mode: "cancel"`,
+`ALTER SYSTEM CANCEL SQL`, exige 19c+, reversível) ou derruba a sessão (`mode: "kill"`,
+`ALTER SYSTEM KILL SESSION ... IMMEDIATE`, faz ROLLBACK) por `sid`+`serial`. Exige
+`ALTER SYSTEM` e é bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
 
 ## Cache de tipos
 
