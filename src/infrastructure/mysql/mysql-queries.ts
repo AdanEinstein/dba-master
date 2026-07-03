@@ -47,6 +47,19 @@ export class MysqlQueries {
     return this.conn.query<MysqlTableRow>(sql, params);
   }
 
+  // ponytail: caveat InnoDB — UPDATE_TIME reflete DML (não só DDL) e pode vir NULL
+  // (buffer pool); COALESCE p/ CREATE_TIME. Se ambos NULL, o provider trata como sem sinal.
+  async findObjectFreshness(name: string, schema?: string): Promise<{ owner: string; name: string; token: unknown }[]> {
+    const params: unknown[] = [name];
+    const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
+    const sql = `
+      SELECT TABLE_SCHEMA as owner, TABLE_NAME as name, COALESCE(UPDATE_TIME, CREATE_TIME) as token
+      FROM information_schema.tables
+      WHERE TABLE_NAME = ? AND ${sc}
+    `;
+    return this.conn.query<{ owner: string; name: string; token: unknown }>(sql, params);
+  }
+
   async findColumns(table: string, schema?: string): Promise<MysqlColumnRow[]> {
     const params: unknown[] = [table];
     const sc = this.schemaCond("TABLE_SCHEMA", params, schema);

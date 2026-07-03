@@ -38,6 +38,13 @@ export class OracleProvider implements DatabaseProvider {
     return rows.map((r) => ({ owner: r.OWNER, name: r.OBJECT_NAME, lastDdlTime: r.LAST_DDL_TIME?.toISOString() ?? "" }));
   }
 
+  async getObjectFreshness(name: string, schema?: string): Promise<{ owner: string; name: string; token: string } | undefined> {
+    const rows = await this.q.findObjectFreshness(name, schema);
+    if (rows.length !== 1) return undefined; // não achou ou ambíguo → deixa o describe resolver
+    const token = rows[0].LAST_DDL_TIME?.toISOString();
+    return token ? { owner: rows[0].OWNER, name: rows[0].OBJECT_NAME, token } : undefined;
+  }
+
   async listTables(schema?: string): Promise<TableRef[]> {
     const rows = await this.q.findTables(schema);
     return rows.map((r) => ({ owner: r.OWNER, tableName: r.TABLE_NAME, numRows: r.NUM_ROWS }));

@@ -4,7 +4,8 @@ import { z } from "zod";
 
 /** Envelope padrão: toda tool devolve JSON em text para consumo por outro agente. */
 export function jsonResult(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+  // ponytail: JSON compacto (sem pretty-print) — corta ~30% de tokens em toda resposta.
+  return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 }
 
 export function errorResult(err: unknown) {

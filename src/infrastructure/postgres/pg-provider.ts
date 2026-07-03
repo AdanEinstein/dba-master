@@ -40,6 +40,12 @@ export class PgProvider implements DatabaseProvider {
     return "unknown"; // json/jsonb/array/user-defined/record/hstore
   }
 
+  async getObjectFreshness(name: string, schema?: string): Promise<{ owner: string; name: string; token: string } | undefined> {
+    const rows = await this.q.findObjectFreshness(name, schema);
+    if (rows.length !== 1) return undefined; // não achou ou ambíguo → describe resolve
+    return rows[0].token ? { owner: rows[0].owner, name: rows[0].name, token: rows[0].token } : undefined;
+  }
+
   async listTables(schema?: string): Promise<TableRef[]> {
     const rows = await this.q.findTables(schema);
     return rows.map(toTableRef);
