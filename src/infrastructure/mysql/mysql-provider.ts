@@ -219,7 +219,37 @@ export class MysqlProvider implements DatabaseProvider {
   }
 
   async listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]> {
-    return [];
+    const routines = await this.queries.findRoutines(schema, pattern);
+    const params = await this.queries.findParameters(schema);
+
+    // Agrupar parâmetros por rotina
+    const paramMap = new Map<string, any[]>();
+    for (const p of params) {
+      const key = `${p.owner}.${p.routine_name}`;
+      let list = paramMap.get(key);
+      if (!list) {
+        list = [];
+        paramMap.set(key, list);
+      }
+      list.push(p);
+    }
+
+    return routines.map(r => {
+      const key = `${r.owner}.${r.name}`;
+      const rParams = paramMap.get(key) || [];
+      return {
+        owner: r.owner,
+        name: r.name,
+        packageName: null,
+        objectType: r.type as "PROCEDURE" | "FUNCTION",
+        arguments: rParams.map(p => ({
+          name: p.param_name,
+          position: p.position,
+          dataType: p.data_type,
+          inOut: p.mode
+        }))
+      };
+    });
   }
 
   async listPackages(schema?: string, pattern?: string): Promise<PackageRef[]> {

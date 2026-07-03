@@ -160,4 +160,28 @@ export class MysqlQueries {
     `;
     return this.conn.query<{ owner: string, table_name: string, column_name: string }>(sql, params);
   }
+
+  async findRoutines(schema?: string, pattern?: string): Promise<{ owner: string, name: string, type: string }[]> {
+    const params: unknown[] = [];
+    const sc = this.schemaCond("ROUTINE_SCHEMA", params, schema);
+    let sql = `SELECT ROUTINE_SCHEMA as owner, ROUTINE_NAME as name, ROUTINE_TYPE as type FROM information_schema.ROUTINES WHERE ${sc}`;
+    if (pattern) {
+      sql += " AND ROUTINE_NAME LIKE ?";
+      params.push("%" + pattern + "%");
+    }
+    sql += " ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME";
+    return this.conn.query<{ owner: string, name: string, type: string }>(sql, params);
+  }
+
+  async findParameters(schema?: string, routineName?: string): Promise<{ owner: string, routine_name: string, param_name: string, data_type: string, mode: string, position: number }[]> {
+    const params: unknown[] = [];
+    const sc = this.schemaCond("SPECIFIC_SCHEMA", params, schema);
+    let sql = `SELECT SPECIFIC_SCHEMA as owner, SPECIFIC_NAME as routine_name, PARAMETER_NAME as param_name, DATA_TYPE as data_type, PARAMETER_MODE as mode, ORDINAL_POSITION as position FROM information_schema.PARAMETERS WHERE ${sc}`;
+    if (routineName) {
+      sql += " AND SPECIFIC_NAME = ?";
+      params.push(routineName);
+    }
+    sql += " ORDER BY SPECIFIC_SCHEMA, SPECIFIC_NAME, ORDINAL_POSITION";
+    return this.conn.query<{ owner: string, routine_name: string, param_name: string, data_type: string, mode: string, position: number }>(sql, params);
+  }
 }
