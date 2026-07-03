@@ -37,10 +37,10 @@ export class MysqlProvider implements DatabaseProvider {
   }
 
   typeToTs(dataType: string): string {
-    const d = dataType.toLowerCase();
-    if (d.includes("int") || d.includes("decimal") || d.includes("numeric") || d.includes("float") || d.includes("double")) return "number";
-    if (d.includes("char") || d.includes("text") || d.includes("blob") || d.includes("json")) return "string";
-    if (d.includes("date") || d.includes("time") || d.includes("year")) return "Date";
+    const t = dataType.toLowerCase();
+    if (/^(int|integer|tinyint|smallint|mediumint|bigint|decimal|numeric|float|double|real|bit)/.test(t)) return "number";
+    if (/^(char|varchar|text|tinytext|mediumtext|longtext|blob|tinyblob|mediumblob|longblob|enum|set|json|binary|varbinary)/.test(t)) return "string";
+    if (/^(date|time|datetime|timestamp|year)/.test(t)) return "Date";
     return "unknown";
   }
 

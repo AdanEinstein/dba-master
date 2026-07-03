@@ -34,11 +34,11 @@ export class MysqlQueries {
   async findTables(schema?: string, pattern?: string): Promise<MysqlTableRow[]> {
     const params: unknown[] = [];
     const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
-    let sql = 
-      "SELECT TABLE_SCHEMA as owner, TABLE_NAME as table_name, TABLE_ROWS as num_rows " +
-      "FROM information_schema.tables " +
-      "WHERE TABLE_TYPE = 'BASE TABLE' AND " + sc;
-    
+    let sql = `
+      SELECT TABLE_SCHEMA as owner, TABLE_NAME as table_name, TABLE_ROWS as num_rows
+      FROM information_schema.tables
+      WHERE TABLE_TYPE = 'BASE TABLE' AND ${sc}
+    `;
     if (pattern) {
       sql += " AND TABLE_NAME LIKE ?";
       params.push("%" + pattern + "%");
@@ -50,31 +50,31 @@ export class MysqlQueries {
   async findColumns(table: string, schema?: string): Promise<MysqlColumnRow[]> {
     const params: unknown[] = [table];
     const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
-    const sql = 
-      "SELECT " +
-      "  COLUMN_NAME as column_name, " +
-      "  DATA_TYPE as data_type, " +
-      "  IS_NULLABLE as nullable, " +
-      "  CHARACTER_MAXIMUM_LENGTH as data_length, " +
-      "  NUMERIC_PRECISION as data_precision, " +
-      "  NUMERIC_SCALE as data_scale, " +
-      "  COLUMN_DEFAULT as data_default, " +
-      "  COLUMN_COMMENT as comments " +
-      "FROM information_schema.columns " +
-      "WHERE TABLE_NAME = ? AND " + sc + " " +
-      "ORDER BY ORDINAL_POSITION";
-    
+    const sql = `
+      SELECT
+        COLUMN_NAME as column_name,
+        DATA_TYPE as data_type,
+        IS_NULLABLE as nullable,
+        CHARACTER_MAXIMUM_LENGTH as data_length,
+        NUMERIC_PRECISION as data_precision,
+        NUMERIC_SCALE as data_scale,
+        COLUMN_DEFAULT as data_default,
+        COLUMN_COMMENT as comments
+      FROM information_schema.columns
+      WHERE TABLE_NAME = ? AND ${sc}
+      ORDER BY ORDINAL_POSITION
+    `;
     return this.conn.query<MysqlColumnRow>(sql, params);
   }
 
   async findViews(schema?: string, pattern?: string): Promise<MysqlViewRow[]> {
     const params: unknown[] = [];
     const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
-    let sql = 
-      "SELECT TABLE_SCHEMA as owner, TABLE_NAME as view_name, VIEW_DEFINITION as text " +
-      "FROM information_schema.views " +
-      "WHERE " + sc;
-    
+    let sql = `
+      SELECT TABLE_SCHEMA as owner, TABLE_NAME as view_name, VIEW_DEFINITION as text
+      FROM information_schema.views
+      WHERE ${sc}
+    `;
     if (pattern) {
       sql += " AND TABLE_NAME LIKE ?";
       params.push("%" + pattern + "%");
@@ -85,26 +85,26 @@ export class MysqlQueries {
 
   async findFks(table: string, schema?: string, direction: "outgoing" | "incoming" = "outgoing"): Promise<MysqlFkRow[]> {
     const params: unknown[] = [];
-    let sql = 
-      "SELECT " +
-      "  CONSTRAINT_NAME as constraint_name, " +
-      "  TABLE_SCHEMA as owner, " +
-      "  TABLE_NAME as table_name, " +
-      "  COLUMN_NAME as column_name, " +
-      "  ORDINAL_POSITION as position, " +
-      "  REFERENCED_TABLE_SCHEMA as r_owner, " +
-      "  REFERENCED_TABLE_NAME as r_table, " +
-      "  REFERENCED_COLUMN_NAME as r_column " +
-      "FROM information_schema.KEY_COLUMN_USAGE " +
-      "WHERE REFERENCED_TABLE_NAME IS NOT NULL";
-    
+    let sql = `
+      SELECT
+        CONSTRAINT_NAME as constraint_name,
+        TABLE_SCHEMA as owner,
+        TABLE_NAME as table_name,
+        COLUMN_NAME as column_name,
+        ORDINAL_POSITION as position,
+        REFERENCED_TABLE_SCHEMA as r_owner,
+        REFERENCED_TABLE_NAME as r_table,
+        REFERENCED_COLUMN_NAME as r_column
+      FROM information_schema.KEY_COLUMN_USAGE
+      WHERE REFERENCED_TABLE_NAME IS NOT NULL
+    `;
     if (direction === "outgoing") {
       const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
-      sql += " AND " + sc + " AND TABLE_NAME = ?";
+      sql += ` AND ${sc} AND TABLE_NAME = ?`;
       params.push(table);
     } else {
       const scRef = this.schemaCond("REFERENCED_TABLE_SCHEMA", params, schema);
-      sql += " AND " + scRef + " AND REFERENCED_TABLE_NAME = ?";
+      sql += ` AND ${scRef} AND REFERENCED_TABLE_NAME = ?`;
       params.push(table);
     }
     sql += " ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
