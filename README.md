@@ -3,7 +3,7 @@
 Servidor MCP (Model Context Protocol) que dá a um agente de IA introspecção profunda de banco de dados — estrutura, DDL, relacionamentos, procedures, jobs — em **JSON estruturado**,
 para investigar o schema e propor soluções (queries, modelagem, diagnósticos) com assertividade.
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e70103de-02d3-45bb-b541-3de2b08e9b70" />
+<img width="1535" height="1024" alt="image" src="https://github.com/user-attachments/assets/9d2f337d-865d-4802-a930-b12ad9aa9e2c" />
 
 Modo **thin** (default para Oracle) é JS puro e não exige Instant Client. Só defina `"thick": true` na conexão se precisar de recursos específicos do client nativo.
 
