@@ -44,6 +44,15 @@ export class MysqlProvider implements DatabaseProvider {
     return "unknown";
   }
 
+  async getObjectFreshness(name: string, schema?: string): Promise<{ owner: string; name: string; token: string } | undefined> {
+    const rows = await this.queries.findObjectFreshness(name, schema);
+    const uniq = rows.filter((r) => r.name.toLowerCase() === name.toLowerCase());
+    if (uniq.length !== 1) return undefined; // não achou ou ambíguo → describe resolve
+    const t = uniq[0].token;
+    const token = t instanceof Date ? t.toISOString() : t ? String(t) : "";
+    return token ? { owner: uniq[0].owner, name: uniq[0].name, token } : undefined;
+  }
+
   async listTables(schema?: string): Promise<TableRef[]> {
     const rows = await this.queries.findTables(schema);
     return rows.map((r) => ({

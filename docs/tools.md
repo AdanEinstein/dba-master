@@ -12,9 +12,9 @@ por outro agente de IA — não para leitura humana direta.
 | `list_connections` | Lista os **nomes** das conexões mapeadas (sem credenciais) | - |
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
-| `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera a interface `.ts` em cache | `table`, `schema?` |
+| `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera/reaproveita a interface `.ts` em cache. Se o cache está fresco, retorna enxuto (`cached:true`, `cacheFile`, `columnCount`) — **leia o `.ts`** | `table`, `schema?`, `force?` |
 | `list_views` | Lista views (owner, nome) | `schema?`, `pattern?` |
-| `describe_view` | Colunas (tipo, nullable, comentário) e o SELECT que define a view; gera a interface `.ts` em cache | `view`, `schema?` |
+| `describe_view` | Colunas (tipo, nullable, comentário) e o SELECT que define a view; gera/reaproveita a interface `.ts` em cache. Cache fresco → retorno enxuto (`cached:true`, `cacheFile`) | `view`, `schema?`, `force?` |
 | `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?` |
@@ -120,12 +120,14 @@ a sessão informada por `connectionId`. Bloqueada quando a conexão está `readO
 
 Em cada `describe_table`/`describe_view`, o objeto vira `<cache>/<NOME_DA_CONEXAO>/<OWNER>/<NOME>.ts` com uma
 `interface` TypeScript (o cache é sempre `.dba-master/types`, ao lado do `connections.json`). O header marca
-`// kind: table`/`// kind: view` e também guarda um `hash` de integridade. Em bloco JSDoc, ele traz o 
+`// kind: table`/`// kind: view`, um `hash` de integridade e um **token de frescor** (`// fresh: …`). Em bloco JSDoc, ele traz o 
 comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos e o comentário de cada coluna. A regeneração é
 **incremental**: o builder valida o hash criptográfico do conteúdo novo e só reescreve no disco
-se houver mudança. A resposta inclui `cacheFile` com o caminho gerado.
+se houver mudança.
 
-Passe `force: true` (ou `--force` no CLI) para ignorar o cache e reescrever tudo (já não é mais estritamente necessário para sincronizar FKs de entrada, pois o hash já captura essa alteração).
+**Consumo (fast-path):** antes do describe completo, `describe_table`/`describe_view` fazem **uma** query barata para obter o token de frescor do objeto (Oracle: `last_ddl_time`; MySQL: `COALESCE(UPDATE_TIME, CREATE_TIME)`; Postgres: `md5` de uma assinatura do catálogo). Se bate com o `// fresh:` do `.ts` (**HIT**), a tool pula o describe e retorna enxuto — `{ "cached": true, "cacheFile", "owner", "tableName"/"viewName", "columnCount" }`; **leia o `.ts`** para o schema. Em **MISS** (token diferente, arquivo ausente, cache legado sem `// fresh:`, ou engine sem sinal), roda o describe completo, reescreve o cache e devolve o `TableSchema` inline com `"cached": false` e `cacheFile`. As respostas agora são **JSON compacto**.
+
+Passe `force: true` (ou `--force` no CLI) para ignorar o cache e refazer o describe completo.
 
 Para popular o diretório inteiro de uma vez, use `generate_interfaces` (tool) ou
 `npx -y dba-master@latest generate` (CLI) — ver [instalacao.md](instalacao.md). Detalhes do cache em

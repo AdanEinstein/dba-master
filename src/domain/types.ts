@@ -187,6 +187,8 @@ const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 export interface InterfaceMeta {
   kind: "table" | "view";
   lastDdlTime?: string;
+  /** Token de frescor gravado no header (`// fresh:`) p/ a fast-path do cache validar sem describe. */
+  freshToken?: string;
   comment?: string | null;
   primaryKey?: string[];
   foreignKeys?: ForeignKey[]; // saída (esta tabela → outra)
@@ -269,7 +271,9 @@ export function generateInterface(
 
   const body = `${docBlock}export interface ${ifaceName} {\n${lines.join("\n")}\n}\n`;
   const hash = createHash("sha256").update(body).digest("hex");
-  const header = `// ${schema}.${table}\n// kind: ${meta.kind}\n// hash: ${hash}\n// gerado por dba-master — não editar à mão`;
+  // `// fresh:` só entra quando o provider forneceu token — cache antigo sem ela cai como miss.
+  const freshLine = meta.freshToken ? `\n// fresh: ${meta.freshToken}` : "";
+  const header = `// ${schema}.${table}\n// kind: ${meta.kind}\n// hash: ${hash}${freshLine}\n// gerado por dba-master — não editar à mão`;
   return `${header}\n${body}`;
 }
 

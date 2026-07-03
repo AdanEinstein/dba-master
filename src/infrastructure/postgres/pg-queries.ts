@@ -86,6 +86,38 @@ export class PgQueries {
     );
   }
 
+  /**
+   * Assinatura de frescor: md5 determinístico de colunas + constraints + índices do objeto.
+   * Postgres não tem last-DDL nativo, então derivamos um token do próprio catálogo — muda
+   * quando o schema estrutural muda. Uma query só, sem privilégio especial (readOnly ok).
+   */
+  findObjectFreshness(name: string, schema?: string): Promise<{ owner: string; name: string; token: string }[]> {
+    const params: unknown[] = [name];
+    const sc = this.schemaCond("n.nspname", params, schema);
+    return this.conn.query<{ owner: string; name: string; token: string }>(
+      `SELECT n.nspname AS owner, c.relname AS name,
+              md5(string_agg(sigs.sig, '|' ORDER BY sigs.sig)) AS token
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN LATERAL (
+           SELECT 'c:' || a.attnum || ':' || a.attname || ':'
+                  || format_type(a.atttypid, a.atttypmod) || ':' || a.attnotnull AS sig
+             FROM pg_attribute a
+            WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+           UNION ALL
+           SELECT 'k:' || con.conname || ':' || pg_get_constraintdef(con.oid)
+             FROM pg_constraint con WHERE con.conrelid = c.oid
+           UNION ALL
+           SELECT 'i:' || ic.relname || ':' || pg_get_indexdef(ix.indexrelid)
+             FROM pg_index ix JOIN pg_class ic ON ic.oid = ix.indexrelid
+            WHERE ix.indrelid = c.oid
+         ) sigs ON true
+        WHERE lower(c.relname) = lower($1) AND c.relkind IN ('r','p','v','m') AND ${sc}
+        GROUP BY n.nspname, c.relname`,
+      params,
+    );
+  }
+
   findViews(schema?: string, pattern?: string): Promise<PgViewRow[]> {
     const params: unknown[] = [];
     const sc = this.schemaCond("n.nspname", params, schema);

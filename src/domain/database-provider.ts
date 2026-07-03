@@ -33,6 +33,13 @@ export interface DatabaseProvider {
   /** last_ddl_time de todas as tabelas/views do schema, em UMA query (fast-path do cache). */
   listDdlTimes?(schema?: string): Promise<{ owner: string; name: string; lastDdlTime: string }[]>;
 
+  /**
+   * Token de frescor de UM objeto (tabela/view) em UMA query barata, p/ validar o cache
+   * sem o describe completo. Retorna owner canônico (localiza o .ts) + token opaco.
+   * undefined = objeto ausente/ambíguo ou sem sinal de frescor confiável. Opcional por engine.
+   */
+  getObjectFreshness?(name: string, schema?: string): Promise<{ owner: string; name: string; token: string } | undefined>;
+
   listTables(schema?: string): Promise<TableRef[]>;
   searchTables(pattern: string, schema?: string): Promise<TableRef[]>;
   /** Descreve a tabela (sem gerar cache — isso é responsabilidade da tool). */

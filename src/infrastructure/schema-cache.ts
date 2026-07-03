@@ -10,6 +10,46 @@ export function readCachedHash(content: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
+/** Token de frescor gravado no header (`// fresh:`). Ausente em cache antigo → undefined. */
+export function readCachedFreshToken(content: string): string | undefined {
+  const m = content.match(/^\/\/ fresh: (.+)$/m);
+  return m ? m[1].trim() : undefined;
+}
+
+/** Caminho do .ts de um objeto: cacheDir/<connectionName>/<OWNER>/<OBJ>.ts. */
+export function tableCachePath(cacheDir: string, connectionName: string, owner: string, table: string): string {
+  return join(cacheDir, connectionName, owner, `${table}.ts`);
+}
+
+// Conta as linhas de coluna da interface (`  KEY: tipo;`), ignorando JSDoc e `}`.
+// ponytail: heurística por regex — suficiente pro columnCount informativo da resposta enxuta.
+function countCachedColumns(content: string): number {
+  return (content.match(/^ {2}("|\w)[^\n]*;$/gm) ?? []).length;
+}
+
+/**
+ * Fast-path do cache: se o .ts existe e seu token de frescor bate com `token`,
+ * devolve o caminho + contagem de colunas (sem describe). Caso contrário undefined.
+ */
+export async function readFreshCache(
+  cacheDir: string,
+  connectionName: string,
+  owner: string,
+  table: string,
+  token: string,
+): Promise<{ file: string; columnCount: number } | undefined> {
+  const file = tableCachePath(cacheDir, connectionName, owner, table);
+  try {
+    const content = await readFile(file, "utf8");
+    if (readCachedFreshToken(content) === token) {
+      return { file, columnCount: countCachedColumns(content) };
+    }
+  } catch {
+    // arquivo não existe — miss
+  }
+  return undefined;
+}
+
 /**
  * Grava a interface .ts da tabela/view em cacheDir/<connectionName>/<OWNER>/<OBJ>.ts.
  * Se o hash do header bater com o atual, pula a regeneração (a menos de `force`).
@@ -30,7 +70,7 @@ export async function writeTableCache(
   force = false,
 ): Promise<string> {
   const dir = join(cacheDir, connectionName, owner);
-  const file = join(dir, `${table}.ts`);
+  const file = tableCachePath(cacheDir, connectionName, owner, table);
 
   const content = generateInterface(owner, table, columns, typeToTs, meta);
 
