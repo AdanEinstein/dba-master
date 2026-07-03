@@ -36,6 +36,7 @@
     "@clack/prompts": "^1.6.0",
     "@modelcontextprotocol/server": "^2.0.0-beta.1",
     "cfonts": "^3.3.1",
+    "mysql2": "^3.22.5",
     "oracledb": "^7.0.0",
     "pg": "^8.22.0",
     "socks": "^2.8.9",

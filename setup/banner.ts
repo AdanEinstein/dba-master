@@ -19,7 +19,7 @@ const REVEAL_DELAY_MS = 40; // por linha do logo
 const RULE_DELAY_MS = 6; // por caractere da régua
 const TYPE_DELAY_MS = 14; // por caractere da tagline
 
-const TAGLINE = "Introspecção de banco para agentes de IA · Oracle · PostgreSQL";
+const TAGLINE = "Introspecção de banco para agentes de IA · Oracle · PostgreSQL · MySQL";
 
 export interface BannerStyle {
   colors: [string, string];

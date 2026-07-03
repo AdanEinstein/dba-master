@@ -34,7 +34,7 @@ O engine é escolhido pelo campo `engine` da conexão. Recursos exclusivos de um
 
 - [x] **Oracle** (`oracle`) — thin/thick, packages, jobs agendados, DDL via `DBMS_METADATA`
 - [x] **PostgreSQL** (`postgres`) — conexão via URL, DDL nativo (`pg_get_viewdef`/`pg_get_functiondef`) + `CREATE TABLE` reconstruído
-- [ ] **MySQL** — planejado
+- [x] **MySQL / MariaDB** (`mysql`) — conexão via URL, tabelas, views, dicionário via `information_schema`
 - [ ] **SQL Server** — planejado
 
 ## Instalação e Configuração

@@ -600,7 +600,7 @@ export async function runConfigure() {
           options: [
             { value: "oracle", label: "Oracle Database" },
             { value: "postgres", label: "PostgreSQL" },
-            { value: "mysql", label: "MySQL (Em breve)", disabled: true },
+            { value: "mysql", label: "MySQL / MariaDB" },
             { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
           ],
           initialValue: connToEdit.engine
@@ -610,10 +610,11 @@ export async function runConfigure() {
         // Postgres: credenciais vêm embutidas na URL de conexão — não pedir user/senha.
         let editDbUser = "";
         let editDbPassword = "";
-        if (editEngine !== "postgres") {
+        const skipAuthPrompt = ["postgres", "mysql"].includes(editEngine);
+
+        if (!skipAuthPrompt) {
           editDbUser = await text({
-            message: "Usuário do banco de dados:",
-            defaultValue: connToEdit.user
+            message: "Usuário do banco de dados (deixe em branco para manter o atual):"
           }) as string;
           if (isCancel(editDbUser)) { cancel("Cancelado"); process.exit(0); }
 
@@ -622,7 +623,7 @@ export async function runConfigure() {
           }) as string;
           if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
         } else {
-          log.info("PostgreSQL: usuário e senha vêm da própria URL de conexão.");
+          log.info(`${editEngine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vêm da própria URL de conexão.`);
         }
 
         const editConnectString = await text({
@@ -635,8 +636,8 @@ export async function runConfigure() {
         // ponytail: troca de engine pode deixar env var órfã (ex: USER/PASS ao virar
         // postgres); export não-usado é inofensivo, ignoramos.
         const { userVal, passVal, csVal } = await applyEnvRefs(toEdit as string, editEngine, {
-          user: editEngine === "postgres" ? "" : (editDbUser || connToEdit.user),
-          password: editEngine === "postgres" ? undefined : (editDbPassword || connToEdit.password),
+          user: skipAuthPrompt ? "" : (editDbUser || connToEdit.user),
+          password: skipAuthPrompt ? undefined : (editDbPassword || connToEdit.password),
           connectString: editConnectString || connToEdit.connectString
         });
 
@@ -644,8 +645,8 @@ export async function runConfigure() {
 
         connections[toEdit as string] = {
           engine: editEngine,
-          user: editEngine === "postgres" ? "" : (userVal ?? ""),
-          password: editEngine === "postgres" ? undefined : passVal,
+          user: skipAuthPrompt ? "" : (userVal ?? ""),
+          password: skipAuthPrompt ? undefined : passVal,
           connectString: csVal,
           thick: connToEdit.thick || false,
           ...(editTunnel ? { tunnel: editTunnel } : {})
@@ -669,16 +670,17 @@ export async function runConfigure() {
         options: [
           { value: "oracle", label: "Oracle Database", hint: "thin / thick" },
           { value: "postgres", label: "PostgreSQL", hint: "via URL" },
-          { value: "mysql", label: "MySQL (Em breve)", disabled: true },
+          { value: "mysql", label: "MySQL / MariaDB", hint: "via URL" },
           { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
         ]
       }) as string;
       if (isCancel(engine)) { cancel("Cancelado"); process.exit(0); }
 
-      // Postgres: credenciais vêm embutidas na URL de conexão — não pedir user/senha.
+      // Postgres e MySQL: credenciais vêm embutidas na URL de conexão
       let dbUser = "";
       let dbPassword: string | undefined;
-      if (engine !== "postgres") {
+      const skipNewAuthPrompt = ["postgres", "mysql"].includes(engine);
+      if (!skipNewAuthPrompt) {
         dbUser = await text({
           message: "Usuário do banco de dados:"
         }) as string;
@@ -689,7 +691,7 @@ export async function runConfigure() {
         }) as string;
         if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
       } else {
-        log.info("PostgreSQL: usuário e senha vêm da própria URL de conexão.");
+        log.info(`${engine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vêm da própria URL de conexão.`);
       }
 
       const connectString = await text({
