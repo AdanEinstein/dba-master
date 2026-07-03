@@ -110,4 +110,54 @@ export class MysqlQueries {
     sql += " ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
     return this.conn.query<MysqlFkRow>(sql, params);
   }
+  async findPrimaryKey(table: string, schema?: string): Promise<{ column_name: string }[]> {
+    const params: unknown[] = [table];
+    const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
+    const sql = `SELECT COLUMN_NAME as column_name FROM information_schema.KEY_COLUMN_USAGE WHERE CONSTRAINT_NAME = 'PRIMARY' AND TABLE_NAME = ? AND ${sc} ORDER BY ORDINAL_POSITION`;
+    return this.conn.query<{ column_name: string }>(sql, params);
+  }
+
+  async findIndexes(table: string, schema?: string): Promise<{ index_name: string, column_name: string, non_unique: number }[]> {
+    const params: unknown[] = [table];
+    const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
+    const sql = `SELECT INDEX_NAME as index_name, COLUMN_NAME as column_name, NON_UNIQUE as non_unique FROM information_schema.STATISTICS WHERE TABLE_NAME = ? AND INDEX_NAME != 'PRIMARY' AND ${sc} ORDER BY INDEX_NAME, SEQ_IN_INDEX`;
+    return this.conn.query<{ index_name: string, column_name: string, non_unique: number }>(sql, params);
+  }
+
+  async findCheckConstraints(table: string, schema?: string): Promise<{ constraint_name: string, check_clause: string }[]> {
+    const params: unknown[] = [table];
+    const sc = this.schemaCond("tc.TABLE_SCHEMA", params, schema);
+    const sql = `
+      SELECT cc.CONSTRAINT_NAME as constraint_name, cc.CHECK_CLAUSE as check_clause
+      FROM information_schema.CHECK_CONSTRAINTS cc
+      JOIN information_schema.TABLE_CONSTRAINTS tc 
+        ON cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME AND cc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
+      WHERE tc.TABLE_NAME = ? AND ${sc}
+    `;
+    try {
+      return await this.conn.query<{ constraint_name: string, check_clause: string }>(sql, params);
+    } catch {
+      return [];
+    }
+  }
+
+  async inventoryColumns(schema?: string): Promise<{ owner: string, table_name: string, column_name: string, data_type: string }[]> {
+    const params: unknown[] = [];
+    const sc = this.schemaCond("TABLE_SCHEMA", params, schema);
+    const sql = `SELECT TABLE_SCHEMA as owner, TABLE_NAME as table_name, COLUMN_NAME as column_name, DATA_TYPE as data_type FROM information_schema.columns WHERE ${sc}`;
+    return this.conn.query<{ owner: string, table_name: string, column_name: string, data_type: string }>(sql, params);
+  }
+
+  async inventoryKeyColumns(type: "PRIMARY KEY" | "FOREIGN KEY", schema?: string): Promise<{ owner: string, table_name: string, column_name: string }[]> {
+    const params: unknown[] = [];
+    const sc = this.schemaCond("tc.TABLE_SCHEMA", params, schema);
+    const sql = `
+      SELECT kcu.TABLE_SCHEMA as owner, kcu.TABLE_NAME as table_name, kcu.COLUMN_NAME as column_name
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      JOIN information_schema.TABLE_CONSTRAINTS tc
+        ON kcu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME AND kcu.TABLE_SCHEMA = tc.TABLE_SCHEMA
+      WHERE tc.CONSTRAINT_TYPE = '${type}' AND ${sc}
+    `;
+    return this.conn.query<{ owner: string, table_name: string, column_name: string }>(sql, params);
+  }
 }

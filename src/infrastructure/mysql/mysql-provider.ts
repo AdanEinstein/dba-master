@@ -84,14 +84,33 @@ export class MysqlProvider implements DatabaseProvider {
 
     const fkRows = await this.queries.findFks(table, schema, "outgoing");
 
+    const pkRows = await this.queries.findPrimaryKey(tbl.table_name, tbl.owner);
+    const idxRows = await this.queries.findIndexes(tbl.table_name, tbl.owner);
+    const chkRows = await this.queries.findCheckConstraints(tbl.table_name, tbl.owner);
+
+    const primaryKey = pkRows.map(r => r.column_name);
+    
+    const idxMap = new Map<string, import("../../domain/types.js").IndexInfo>();
+    for (const r of idxRows) {
+      let idx = idxMap.get(r.index_name);
+      if (!idx) {
+        idx = { indexName: r.index_name, unique: r.non_unique === 0, columns: [] };
+        idxMap.set(r.index_name, idx);
+      }
+      idx.columns.push(r.column_name);
+    }
+    const indexes = Array.from(idxMap.values());
+
+    const checkConstraints = chkRows.map(r => ({ name: r.constraint_name, condition: r.check_clause }));
+
     return {
       owner: tbl.owner,
       tableName: tbl.table_name,
       columns,
-      primaryKey: [],
+      primaryKey,
       foreignKeys: this.groupFks(fkRows),
-      indexes: [],
-      checkConstraints: [],
+      indexes,
+      checkConstraints,
     };
   }
 
@@ -129,7 +148,16 @@ export class MysqlProvider implements DatabaseProvider {
   }
 
   async getSchemaInventory(schema?: string): Promise<SchemaInventory> {
-    throw new Error("Not implemented");
+    const [cols, pks, fks] = await Promise.all([
+      this.queries.inventoryColumns(schema),
+      this.queries.inventoryKeyColumns("PRIMARY KEY", schema),
+      this.queries.inventoryKeyColumns("FOREIGN KEY", schema),
+    ]);
+    return {
+      columns: cols.map((r) => ({ owner: r.owner, table: r.table_name, column: r.column_name, dataType: r.data_type })),
+      primaryKeys: pks.map((r) => ({ owner: r.owner, table: r.table_name, column: r.column_name })),
+      declaredFkColumns: fks.map((r) => ({ owner: r.owner, table: r.table_name, column: r.column_name })),
+    };
   }
 
   async listViews(schema?: string, pattern?: string): Promise<ViewRef[]> {
@@ -169,7 +197,25 @@ export class MysqlProvider implements DatabaseProvider {
   }
 
   async getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult> {
-    throw new Error("Not implemented");
+    const isView = objectType?.toUpperCase() === 'VIEW';
+    const type = isView ? 'VIEW' : 'TABLE';
+    const target = schema ? `${schema}.${name}` : name;
+    try {
+      const rows = await this.conn.query<any>(`SHOW CREATE ${type} ${target}`);
+      if (rows.length === 0) throw new Error(`Objeto não encontrado: ${target}`);
+      
+      const row = rows[0];
+      const ddl = isView ? row['Create View'] : row['Create Table'];
+      
+      return {
+        owner: schema || "",
+        objectName: name,
+        objectType: type as "TABLE" | "VIEW",
+        ddl,
+      };
+    } catch (e) {
+      throw new Error(`Erro ao gerar DDL para ${target}: ${(e as Error).message}`);
+    }
   }
 
   async listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]> {
@@ -184,8 +230,10 @@ export class MysqlProvider implements DatabaseProvider {
     return [];
   }
 
-  async runSql(sql: string, maxRows?: number): Promise<RunSqlResult> {
-    throw new Error("Not implemented");
+  async runSql(sql: string, maxRows = 200): Promise<RunSqlResult> {
+    const raw = await this.conn.query<any>(sql);
+    const rows = Array.isArray(raw) ? raw.slice(0, maxRows) : [];
+    return { rows, rowCount: Array.isArray(raw) ? raw.length : (raw as any).affectedRows || 0 };
   }
 
   async close(): Promise<void> {

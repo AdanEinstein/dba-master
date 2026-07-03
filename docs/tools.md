@@ -18,7 +18,7 @@ por outro agente de IA — não para leitura humana direta.
 | `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?` |
-| `get_ddl` | DDL de objetos. Oracle: tabela/view/procedure/package/trigger/sequence/type (via `DBMS_METADATA`). Postgres: table (reconstruída), view/materialized view e function/procedure (nativo) | `name`, `schema?`, `objectType?` |
+| `get_ddl` | DDL de objetos. Oracle: via `DBMS_METADATA`. Postgres: table (reconstruída), view e function. MySQL: table e view (nativo) | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
