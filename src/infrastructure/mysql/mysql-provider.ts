@@ -25,7 +25,7 @@ export class MysqlProvider implements DatabaseProvider {
   public readonly engine = "mysql";
   public readonly capabilities: Capabilities = {
     packages: false,
-    scheduledJobs: false,
+    scheduledJobs: true,
   };
 
   private conn: MysqlConnection;
@@ -257,7 +257,22 @@ export class MysqlProvider implements DatabaseProvider {
   }
 
   async listScheduledJobs(schema?: string, pattern?: string): Promise<ScheduledJob[]> {
-    return [];
+    const events = await this.queries.findEvents(schema, pattern);
+    return events.map(e => ({
+      owner: e.owner,
+      jobName: e.job_name,
+      jobAction: e.job_action,
+      scheduleType: e.schedule_type,
+      repeatInterval: e.schedule_type === 'RECURRING' ? e.repeat_interval : null,
+      enabled: e.status === 'ENABLED' || e.status === 'SLAVESIDE_DISABLED',
+      state: e.status,
+      lastStartDate: e.last_executed ? String(e.last_executed) : null,
+      nextRunDate: e.schedule_type === 'RECURRING' ? (e.starts ? String(e.starts) : null) : (e.execute_at ? String(e.execute_at) : null),
+      comments: e.comments || null,
+      engineSpecific: {
+        status: e.status,
+      }
+    }));
   }
 
   async runSql(sql: string, maxRows = 200): Promise<RunSqlResult> {

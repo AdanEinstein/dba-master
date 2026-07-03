@@ -260,7 +260,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 
 ### Capability flag
 
-Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }` com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false` (não há packages PL/SQL nem scheduler nativo).
+Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }` com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false` (não há packages PL/SQL nem scheduler nativo). No MySQL, `list_packages` é `false` mas `list_schedulers_jobs` é `true` (mapeado para MySQL Events).
 
 ### `run_sql` e o modo read-only
 

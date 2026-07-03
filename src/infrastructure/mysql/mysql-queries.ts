@@ -184,4 +184,28 @@ export class MysqlQueries {
     sql += " ORDER BY SPECIFIC_SCHEMA, SPECIFIC_NAME, ORDINAL_POSITION";
     return this.conn.query<{ owner: string, routine_name: string, param_name: string, data_type: string, mode: string, position: number }>(sql, params);
   }
+  async findEvents(schema?: string, pattern?: string): Promise<any[]> {
+    const params: unknown[] = [];
+    const sc = this.schemaCond("EVENT_SCHEMA", params, schema);
+    let sql = `
+      SELECT 
+        EVENT_SCHEMA as owner, 
+        EVENT_NAME as job_name, 
+        EVENT_DEFINITION as job_action, 
+        EVENT_TYPE as schedule_type, 
+        CONCAT(INTERVAL_VALUE, ' ', INTERVAL_FIELD) as repeat_interval, 
+        STATUS as status, 
+        LAST_EXECUTED as last_executed, 
+        STARTS as starts, 
+        EXECUTE_AT as execute_at, 
+        EVENT_COMMENT as comments 
+      FROM information_schema.EVENTS WHERE ${sc}
+    `;
+    if (pattern) {
+      sql += " AND EVENT_NAME LIKE ?";
+      params.push("%" + pattern + "%");
+    }
+    sql += " ORDER BY EVENT_SCHEMA, EVENT_NAME";
+    return this.conn.query<any>(sql, params);
+  }
 }
