@@ -1,7 +1,7 @@
 {
   "name": "dba-master",
   "version": "1.0.4",
-  "description": "MCP server para introspecção profunda de bancos Oracle, voltado a consumo por agentes de IA",
+  "description": "MCP server para introspecção profunda de bancos de dados (Oracle, PostgreSQL, MySQL/MariaDB), voltado a consumo por agentes de IA e LLMs",
   "type": "module",
   "bin": {
     "dba-master": "dist/src/index.js"
@@ -24,13 +24,22 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "oracle",
     "oracledb",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "mariadb",
     "dba",
     "schema",
-    "introspection"
+    "database",
+    "introspection",
+    "ai",
+    "llm",
+    "claude"
   ],
-  "author": "",
+  "author": "AdanEinstein",
   "license": "ISC",
   "dependencies": {
     "@clack/prompts": "^1.6.0",
@@ -52,8 +61,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AdanEinstein/dba-master"
+    "url": "https://github.com/AdanEinstein/dba-master.git"
   },
+  "bugs": {
+    "url": "https://github.com/AdanEinstein/dba-master/issues"
+  },
+  "homepage": "https://github.com/AdanEinstein/dba-master#readme",
   "contributors": [
     {
       "name": "AdanEinstein",
