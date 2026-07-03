@@ -39,8 +39,10 @@ export function parseEndpoint(engine: string, connectString: string): Endpoint {
     return { host: m[1], port: m[2] ? Number(m[2]) : 1521 };
   }
   // Postgres: postgresql://user:pass@host:port/db
+  // MySQL: mysql://user:pass@host:port/db
   const u = new URL(connectString);
-  return { host: u.hostname, port: u.port ? Number(u.port) : 5432 };
+  const defaultPort = engine === "mysql" ? 3306 : 5432;
+  return { host: u.hostname, port: u.port ? Number(u.port) : defaultPort };
 }
 
 // Reescreve o connectString para apontar ao endpoint local do túnel.

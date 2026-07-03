@@ -19,19 +19,33 @@ const REVEAL_DELAY_MS = 40; // por linha do logo
 const RULE_DELAY_MS = 6; // por caractere da régua
 const TYPE_DELAY_MS = 14; // por caractere da tagline
 
-const TAGLINE = "Introspecção de banco para agentes de IA · Oracle · PostgreSQL";
+const TAGLINE = "Introspecção de banco para agentes de IA · Oracle · PostgreSQL · MySQL";
 
 export interface BannerStyle {
   colors: [string, string];
   gradient: [string, string];
 }
 
-/** "#f80"/"#ff8800" → [r, g, b]. */
-function toRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const n = parseInt(full, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+function toRgb(color: string): [number, number, number] {
+  if (color.startsWith("#")) {
+    const h = color.replace("#", "");
+    const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+    const n = parseInt(full, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const colors: Record<string, [number, number, number]> = {
+    red: [255, 0, 0],
+    green: [0, 255, 0],
+    blue: [0, 0, 255],
+    yellow: [255, 255, 0],
+    cyan: [0, 255, 255],
+    magenta: [255, 0, 255],
+    white: [255, 255, 255],
+    black: [0, 0, 0],
+    gray: [128, 128, 128],
+    grey: [128, 128, 128]
+  };
+  return colors[color.toLowerCase()] || [255, 255, 255];
 }
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -69,7 +83,7 @@ export async function showBanner(style: BannerStyle): Promise<void> {
   }) as unknown as { array: string[] };
 
   const width = Math.max(1, ...array.map((l) => strip(l).length));
-  const rule = gradientRuleCells(width, style.colors[0], style.colors[1]);
+  const rule = gradientRuleCells(width, style.gradient[0], style.gradient[1]);
   const pad = " ".repeat(Math.max(0, Math.floor((width - TAGLINE.length) / 2)));
 
   const out = (s: string) => process.stdout.write(s);

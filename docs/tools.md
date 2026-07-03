@@ -18,7 +18,7 @@ por outro agente de IA — não para leitura humana direta.
 | `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?` |
-| `get_ddl` | DDL de objetos. Oracle: tabela/view/procedure/package/trigger/sequence/type (via `DBMS_METADATA`). Postgres: table (reconstruída), view/materialized view e function/procedure (nativo) | `name`, `schema?`, `objectType?` |
+| `get_ddl` | DDL de objetos. Oracle: via `DBMS_METADATA`. Postgres: table (reconstruída), view e function. MySQL: table e view (nativo) | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
@@ -27,6 +27,8 @@ por outro agente de IA — não para leitura humana direta.
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `READ_ONLY=false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle.** Monitoramento (leitura): sessões, locks, top SQL, tablespace/segments, cache, índices, redo, Data Guard. Escolha a métrica em `check` (ver abaixo). Exige `SELECT_CATALOG_ROLE` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`. Exige `READ_ONLY=false` e `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
+| `mysql_monitor` | **Só MySQL.** Monitoramento (leitura): sessões, locks, transações longas, top queries, engine status. Escolha a métrica em `check` (ver abaixo) | `check` |
+| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela (`query`) ou derruba (`connection`) uma sessão pelo `connectionId`. Exige `READ_ONLY=false` na conexão | `connectionId`, `mode?` |
 
 ## Parâmetros comuns
 
@@ -39,7 +41,8 @@ por outro agente de IA — não para leitura humana direta.
 Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo
 `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }`
 com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false`
-(não há packages PL/SQL nem scheduler nativo).
+(não há packages PL/SQL nem scheduler nativo). No MySQL, `list_packages` é `false` mas
+`list_schedulers_jobs` é `true` (mapeado para MySQL Events).
 
 ## `run_sql` e o modo read-only
 
@@ -93,8 +96,25 @@ Valores de `check`, por área:
 
 `ora_kill_session` é a única ação destrutiva: cancela só o SQL em curso (`mode: "cancel"`,
 `ALTER SYSTEM CANCEL SQL`, exige 19c+, reversível) ou derruba a sessão (`mode: "kill"`,
-`ALTER SYSTEM KILL SESSION ... IMMEDIATE`, faz ROLLBACK) por `sid`+`serial`. Exige
-`ALTER SYSTEM` e é bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
+`ALTER SYSTEM KILL SESSION ... IMMEDIATE`, faz ROLLBACK) por `sid`+`serial`. Exige `ALTER SYSTEM` e é bloqueada quando
+a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
+
+## Monitoramento MySQL / MariaDB (`mysql_monitor` / `mysql_kill_session`)
+
+Exclusivas do engine MySQL. `mysql_monitor` é somente
+leitura — cada `check` é um `SELECT` fixo sobre as tabelas de sistema (`information_schema`, `performance_schema`)
+ou comandos de diagnóstico nativos (`SHOW`).
+
+Valores de `check`, por área:
+
+- **Atividade:** `active_queries` (queries em execução exceto comando Sleep), `all_activity` (todo o processlist), `long_transactions` (transações abertas no InnoDB — retêm undo).
+- **Locks:** `blocking_locks` (blocked × blocking do InnoDB via `innodb_lock_waits`).
+- **Queries:** `top_queries` (via `performance_schema.events_statements_summary_by_digest` — exige que a performance_schema esteja habilitada).
+- **Storage:** `table_sizes` (tamanho aproximado das tabelas com base em index_length + data_length).
+- **Engine:** `engine_status` (saída crua de `SHOW ENGINE INNODB STATUS`).
+
+`mysql_kill_session` é a única ação destrutiva: cancela (`mode: "query"`, reversível) ou derruba (`mode: "connection"`, faz ROLLBACK)
+a sessão informada por `connectionId`. Bloqueada quando a conexão está `readOnly` (default) — mesma guarda de `run_sql`.
 
 ## Cache de tipos
 
