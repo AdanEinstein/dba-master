@@ -250,6 +250,8 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `READ_ONLY=false` | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle, leitura.** Monitoramento: sessões, locks, top SQL, tablespace, cache, índices, redo, Data Guard — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`; exige `READ_ONLY=false` + `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
+| `mysql_monitor` | **Só MySQL, leitura.** Monitoramento: sessões, locks, transações longas, top queries (performance_schema), engine status — via `check` | `check` |
+| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela a query ou derruba a conexão por `connectionId`; exige `READ_ONLY=false` | `connectionId`, `mode?` |
 
 **Parâmetros comuns:**
 - **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
@@ -295,6 +297,18 @@ Escolha a métrica em `check`: atividade (`active_queries`, `long_transactions`)
 `ora_kill_session(sid, serial, mode)` é a única ação destrutiva: `cancel` (só o SQL, 19c+,
 reversível) ou `kill` (derruba a sessão, ROLLBACK). Exige `ALTER SYSTEM` e é bloqueada quando
 a conexão está `readOnly` (default). Para diagnósticos guiados, use o comando `/dba-ora-monitor`.
+
+### Monitoramento MySQL / MariaDB (`mysql_monitor` / `mysql_kill_session`)
+
+Exclusivas do engine MySQL. `mysql_monitor` é somente leitura — cada `check` é um `SELECT`
+fixo sobre as tabelas de sistema do `information_schema` e `performance_schema`.
+Escolha a métrica em `check`: atividade (`active_queries`, `all_activity`, `long_transactions`), locks (`blocking_locks`),
+`top_queries` (exige extensão `performance_schema` ativada), storage (`table_sizes`), e `engine_status`.
+
+`mysql_kill_session(connectionId, mode)` é a única ação destrutiva: `query` (só o SQL,
+reversível) ou `connection` (derruba a sessão, ROLLBACK). Bloqueada quando
+a conexão está `readOnly` (default). Para diagnósticos guiados, use o comando `/dba-mysql-monitor`.
+
 
 ### Cache de tipos
 

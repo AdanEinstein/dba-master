@@ -38,6 +38,10 @@ const COMMANDS: Command[] = [
     cmd: "dba-ora-monitor",
     desc: "Monitora e diagnostica Oracle (sessões, locks, top SQL, tablespace, cache, Data Guard) via ora_monitor; encerra sessões via ora_kill_session quando autorizado",
   },
+  {
+    cmd: "dba-mysql-monitor",
+    desc: "Monitora e diagnostica MySQL (sessões, locks, threads) via mysql_monitor; encerra sessões via mysql_kill_session quando autorizado",
+  },
 ];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
