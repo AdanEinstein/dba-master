@@ -50,10 +50,10 @@
     "pg": "^8.22.0",
     "socks": "^2.8.9",
     "ssh2": "^1.17.0",
-    "tsx": "^4.22.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "tsx": "^4.22.4",
     "@types/node": "^26.1.0",
     "@types/oracledb": "^7.0.1",
     "@types/pg": "^8.20.0",
