@@ -196,8 +196,9 @@ uma vez** — todas as tabelas (e views) viram `interface` `.ts` no cache (`.dba
 Mesmo estilo do `install`, roda via `npx`:
 
 ```bash
-npx -y dba-master@latest generate                 # todas as tabelas + views
-npx -y dba-master@latest generate --schema HR     # só o schema HR
+npx -y dba-master@latest generate                 # prompt interativo: escolha os schemas (todos marcados por padrão)
+npx -y dba-master@latest generate --schema HR         # só o schema HR, sem prompt
+npx -y dba-master@latest generate --schema HR,SALES   # múltiplos schemas, sem prompt
 npx -y dba-master@latest generate --no-views      # pula views
 npx -y dba-master@latest generate --connection prod   # conexão nomeada
 npx -y dba-master@latest generate --force         # ignora o cache e reescreve tudo

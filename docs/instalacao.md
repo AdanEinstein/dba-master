@@ -130,8 +130,9 @@ Compila em lote as `interface` TypeScript de todas as tabelas (e views) para
 `.dba-master/types/<NOME_DA_CONEXAO>/<OWNER>`. Mesmo estilo do `install` — roda via `npx`, sem clonar:
 
 ```bash
-npx -y dba-master@latest generate                 # todas as tabelas + views dos schemas acessíveis
-npx -y dba-master@latest generate --schema HR     # só o schema HR
+npx -y dba-master@latest generate                 # prompt interativo: escolha os schemas (todos marcados por padrão)
+npx -y dba-master@latest generate --schema HR         # só o schema HR, sem prompt
+npx -y dba-master@latest generate --schema HR,SALES   # múltiplos schemas, sem prompt
 npx -y dba-master@latest generate --no-views      # pula views
 npx -y dba-master@latest generate --connection prod   # escolhe a conexão nomeada
 ```
