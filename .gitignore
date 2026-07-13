@@ -4,3 +4,5 @@
 /docs/superpowers/**
 .env
 .claude.json
+
+tasks
