@@ -40,7 +40,7 @@ Comandos disponíveis:
   uninstall    Remove o MCP Server dos agentes de IA.
   configure    Gerencia as credenciais e configurações de banco de dados (connections.json).
   generate     Compila as interfaces TypeScript do schema do banco de dados (standalone).
-                 --schema <nome>      (Opcional) Especifica um schema
+                 --schema <a,b,...>   (Opcional) Schema(s), separados por vírgula. Sem isso, prompt interativo.
                  --connection <nome>  (Opcional) Conexão a ser usada
                  --no-views           (Opcional) Ignora a compilação de views
                  --force              (Opcional) Força a recompilação
