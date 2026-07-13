@@ -20,6 +20,25 @@ const CONNECT_EXAMPLE: Record<string, string> = {
 };
 const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
 
+// Oracle thick mode: pergunta modo (thin não aceita TNS descriptor completo, LDAP,
+// nem Advanced Security/Wallet) e, se sim, o libDir do Instant Client.
+async function askOracleThick(existing?: { thick?: boolean; clientLibDir?: string }): Promise<{ thick: boolean; clientLibDir?: string }> {
+  const thick = await confirm({
+    message: "Usar thick mode? (necessário para strings de conexão que o thin não aceita: TNS descriptor completo, LDAP, Advanced Security/Wallet)",
+    initialValue: existing?.thick ?? false
+  });
+  if (isCancel(thick)) { cancel("Cancelado"); process.exit(0); }
+  if (!thick) return { thick: false };
+
+  const clientLibDir = await text({
+    message: "Caminho do Instant Client (branco = detecta via ORACLE_HOME/PATH):",
+    defaultValue: existing?.clientLibDir ?? ""
+  }) as string;
+  if (isCancel(clientLibDir)) { cancel("Cancelado"); process.exit(0); }
+
+  return { thick: true, ...(clientLibDir ? { clientLibDir } : {}) };
+}
+
 // Nome de env var a partir do nome da conexão: DBA_<CONN>_<CAMPO>.
 const envVarName = (connName: string, field: string) =>
   `DBA_${connName.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")}_${field}`;
@@ -641,6 +660,10 @@ export async function runConfigure() {
           connectString: editConnectString || connToEdit.connectString
         });
 
+        const editThick = editEngine === "oracle"
+          ? await askOracleThick(connToEdit)
+          : { thick: false };
+
         const editTunnel = await configureTunnel(toEdit as string, connToEdit.tunnel);
 
         connections[toEdit as string] = {
@@ -648,7 +671,7 @@ export async function runConfigure() {
           user: skipAuthPrompt ? "" : (userVal ?? ""),
           password: skipAuthPrompt ? undefined : passVal,
           connectString: csVal,
-          thick: connToEdit.thick || false,
+          ...editThick,
           ...(editTunnel ? { tunnel: editTunnel } : {})
         };
 
@@ -705,6 +728,10 @@ export async function runConfigure() {
         connectString
       });
 
+      const newThick = engine === "oracle"
+        ? await askOracleThick()
+        : { thick: false };
+
       const newTunnel = await configureTunnel(connectionName as string);
 
       connections[connectionName as string] = {
@@ -712,7 +739,7 @@ export async function runConfigure() {
         user: userVal ?? "",
         password: passVal,
         connectString: csVal,
-        thick: false,
+        ...newThick,
         ...(newTunnel ? { tunnel: newTunnel } : {})
       };
 
