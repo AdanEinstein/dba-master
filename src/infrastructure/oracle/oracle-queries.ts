@@ -27,6 +27,17 @@ export interface JobRow {
   NEXT_RUN_DATE: Date | null; COMMENTS: string | null;
 }
 
+// ponytail: ORACLE_MAINTAINED (ALL_USERS) só existe a partir do 12.2; lista fixa
+// cobre 11g e versões novas sem precisar detectar a versão do banco.
+const ORACLE_MAINTAINED_SCHEMAS = [
+  "SYS", "SYSTEM", "OUTLN", "DBSNMP", "APPQOSSYS", "DIP", "ORACLE_OCM",
+  "XS$NULL", "GSMADMIN_INTERNAL", "GSMCATUSER", "GSMUSER", "MDSYS", "ORDSYS",
+  "ORDDATA", "ORDPLUGINS", "SI_INFORMTN_SCHEMA", "LBACSYS", "CTXSYS", "XDB",
+  "WMSYS", "ANONYMOUS", "EXFSYS", "OLAPSYS", "SPATIAL_CSW_ADMIN_USR",
+  "SPATIAL_WFS_ADMIN_USR", "FLOWS_FILES", "OWBSYS", "OWBSYS_AUDIT",
+  "SYSMAN", "MGMT_VIEW", "TSMSYS", "PUBLIC",
+];
+
 export class OracleQueries {
   constructor(
     private readonly conn: OracleConnection,
@@ -48,9 +59,12 @@ export class OracleQueries {
       filter.forEach((s, i) => (binds[`s${i}`] = s));
       return { sql: `${alias}.owner IN (${names})`, binds };
     }
+    const names = ORACLE_MAINTAINED_SCHEMAS.map((_, i) => `:sys${i}`).join(", ");
+    const binds: Record<string, unknown> = {};
+    ORACLE_MAINTAINED_SCHEMAS.forEach((s, i) => (binds[`sys${i}`] = s));
     return {
-      sql: `${alias}.owner IN (SELECT username FROM all_users WHERE oracle_maintained = 'N')`,
-      binds: {},
+      sql: `${alias}.owner NOT IN (${names})`,
+      binds,
     };
   }
 
