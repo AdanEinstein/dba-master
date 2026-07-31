@@ -87,7 +87,8 @@ export class PgQueries {
   }
 
   /**
-   * Assinatura de frescor: md5 determinístico de colunas + constraints + índices do objeto.
+   * Assinatura de frescor: md5 determinístico de colunas + constraints + índices +
+   * comentários (do objeto e de cada coluna) — tudo que vai parar no .ts em cache.
    * Postgres não tem last-DDL nativo, então derivamos um token do próprio catálogo — muda
    * quando o schema estrutural muda. Uma query só, sem privilégio especial (readOnly ok).
    */
@@ -111,6 +112,15 @@ export class PgQueries {
            SELECT 'i:' || ic.relname || ':' || pg_get_indexdef(ix.indexrelid)
              FROM pg_index ix JOIN pg_class ic ON ic.oid = ix.indexrelid
             WHERE ix.indrelid = c.oid
+           UNION ALL
+           -- Comentários entram no .ts (JSDoc), então também entram na assinatura:
+           -- sem isso, um COMMENT ON não invalida o cache. NULL some do string_agg,
+           -- o que já distingue "com comentário" de "sem comentário".
+           SELECT 'm:' || obj_description(c.oid, 'pg_class')
+           UNION ALL
+           SELECT 'd:' || a.attnum || ':' || col_description(c.oid, a.attnum)
+             FROM pg_attribute a
+            WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
          ) sigs ON true
         WHERE lower(c.relname) = lower($1) AND c.relkind IN ('r','p','v','m') AND ${sc}
         GROUP BY n.nspname, c.relname`,
