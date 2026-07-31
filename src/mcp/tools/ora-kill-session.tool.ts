@@ -13,17 +13,16 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     {
       title: "Encerrar sessão Oracle",
       description:
-        "Cancela o SQL em execução (mode=cancel, ALTER SYSTEM CANCEL SQL, exige 19c+) ou derruba a sessão " +
-        "(mode=kill, ALTER SYSTEM KILL SESSION ... IMMEDIATE, faz ROLLBACK) por sid+serial#. " +
-        "Destrutivo: exige READ_ONLY=false na conexão e privilégio ALTER SYSTEM. Só engine Oracle.",
+        "DESTRUTIVO. Cancela o SQL ou derruba a sessão (ROLLBACK) por sid+serial#. " +
+        "Só Oracle; exige READ_ONLY=false e ALTER SYSTEM.",
       inputSchema: z.object({
         connectionName: connectionArg,
-        sid: z.number().int().describe("sid da sessão (coluna sid de ora_monitor active_queries/blocking_locks)."),
+        sid: z.number().int().describe("sid da sessão (coluna sid de ora_monitor)."),
         serial: z.number().int().describe("serial# da sessão (coluna serial de ora_monitor)."),
         mode: z
           .enum(["cancel", "kill"])
           .default("kill")
-          .describe("cancel: cancela só o SQL em curso (19c+, reversível). kill: derruba a sessão (ROLLBACK)."),
+          .describe("cancel: só o SQL em curso (19c+, reversível). kill: derruba a sessão."),
       }),
     },
     async ({ connectionName, sid, serial, mode }) => {

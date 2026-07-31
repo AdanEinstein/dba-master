@@ -17,7 +17,8 @@ comece pelo recorte do alvo, não pelo schema inteiro.
    perguntar ao usuário** qual mapear e passe `connectionName` nas demais tools.
 1. **Delimite o território.** `search_tables` (padrão do nome) ou `list_tables` com o
    `schema`. Identifique as tabelas do domínio-alvo antes de aprofundar.
-2. **Detalhe as tabelas centrais.** `describe_table` — colunas, PK, FKs declaradas,
+2. **Detalhe as tabelas centrais.** `describe_table` devolve o caminho do `.ts` em cache —
+   **leia o arquivo**: colunas, PK, FKs declaradas,
    índices. Anote nomes crípticos e colunas que *parecem* chaves estrangeiras (`*_ID`,
    `*_COD`) mas não têm constraint.
 3. **Reconstrua o grafo ausente.** `infer_relationships` no schema: detecta FKs implícitas

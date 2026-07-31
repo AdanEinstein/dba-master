@@ -12,15 +12,15 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     {
       title: "Encerrar sessão Postgres",
       description:
-        "Cancela (mode=cancel, pg_cancel_backend) ou derruba (mode=terminate, pg_terminate_backend) uma sessão " +
-        "Postgres pelo pid. Destrutivo: exige READ_ONLY=false na conexão. terminate faz ROLLBACK da transação em curso.",
+        "DESTRUTIVO. Cancela o statement ou derruba a sessão (ROLLBACK) pelo pid. " +
+        "Só Postgres; exige READ_ONLY=false.",
       inputSchema: z.object({
         connectionName: connectionArg,
-        pid: z.number().int().describe("pid do backend (coluna pid de pg_monitor active_queries/blocking_locks)."),
+        pid: z.number().int().describe("pid do backend (coluna pid de pg_monitor)."),
         mode: z
           .enum(["cancel", "terminate"])
           .default("cancel")
-          .describe("cancel: cancela o statement (reversível). terminate: derruba a conexão (ROLLBACK)."),
+          .describe("cancel: só o statement (reversível). terminate: derruba a conexão."),
       }),
     },
     async ({ connectionName, pid, mode }) => {

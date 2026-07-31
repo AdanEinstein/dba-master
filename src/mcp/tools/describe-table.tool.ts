@@ -12,7 +12,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     {
       title: "Descrever tabela",
       description:
-        "Detalha uma tabela: colunas (tipo, nullable, default), PK, FKs de saída, índices. Gera/atualiza a interface .ts em cache. Se o cache está fresco, retorna enxuto apontando o .ts (leia o arquivo). Use force=true p/ forçar o describe completo.",
+        "Grava em cache a interface .ts da tabela (colunas, PK, FKs, índices) e retorna o caminho — leia o arquivo. force=true refaz o describe.",
       inputSchema: z.object({
       connectionName: connectionArg,
       table: z.string().describe("Nome da tabela."), schema: schemaArg,
@@ -42,7 +42,11 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
             foreignKeys: s.foreignKeys, checkConstraints: s.checkConstraints, indexes: s.indexes,
             freshToken: fresh?.token },
         );
-        return jsonResult({ ...s, cacheFile, cached: false });
+        // Só o ponteiro: o .ts em cache já tem colunas, PK, FKs, índices e checks.
+        return jsonResult({
+          cached: false, cacheFile,
+          owner: s.owner, tableName: s.tableName, columnCount: s.columns.length,
+        });
       } catch (e) {
         return errorResult(e);
       }

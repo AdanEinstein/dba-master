@@ -14,8 +14,9 @@ comece estreito para não afogar o contexto.
 0. **Selecione o banco de dados.** Comece rodando a tool `list_connections`. Se houver mais de uma conexão listada, você **DEVE perguntar ao usuário** qual conexão ele deseja investigar. Passe esse nome no argumento `connectionName` para as demais tools.
 1. **Localize as entidades.** Use `search_tables` (padrão do nome) ou, se já souber o
    schema, `list_tables` com o `schema`. Não liste tudo se um `search` resolve.
-2. **Detalhe as tabelas relevantes.** `describe_table` traz colunas (tipo, nullable,
-   default), PK, FKs de saída e índices — e gera/atualiza a interface `.ts` em cache.
+2. **Detalhe as tabelas relevantes.** `describe_table` grava a interface `.ts` em cache
+   (colunas, PK, FKs de saída, índices) e devolve o caminho — **leia o arquivo** para ver
+   o schema; ele não vem na resposta da tool.
 3. **Entenda os relacionamentos.** `get_relationships` dá o grafo de FKs: `outgoing`
    (FKs que a tabela possui) e `incoming` (quem a referencia). Essencial para joins
    corretos e para prever o raio de impacto de uma mudança.

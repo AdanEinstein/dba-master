@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
-import { jsonResult, errorResult, schemaArg, patternArg, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, schemaArg, patternArg, connectionArg, tabular, limitArg } from "../shared.js";
 
 export function register(server: McpServer, provider: ProviderManager): void {
   server.registerTool(
@@ -9,18 +9,19 @@ export function register(server: McpServer, provider: ProviderManager): void {
     {
       title: "Listar views",
       description:
-        "Lista views (owner, nome) de um schema ou de todos os schemas acessíveis. Filtra por substring com 'pattern'.",
+        "Lista views (owner, nome) de um schema ou de todos os acessíveis.",
       inputSchema: z.object({
         connectionName: connectionArg,
         schema: schemaArg,
         pattern: patternArg,
+        limit: limitArg,
       }),
     },
-    async ({ connectionName, schema, pattern }) => {
+    async ({ connectionName, schema, pattern, limit }) => {
       const db = provider.getProvider(connectionName);
 
       try {
-        return jsonResult({ views: await db.listViews(schema, pattern) });
+        return jsonResult(tabular(await db.listViews(schema, pattern), limit));
       } catch (e) {
         return errorResult(e);
       }

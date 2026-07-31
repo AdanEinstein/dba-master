@@ -13,17 +13,29 @@ export function errorResult(err: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }], isError: true };
 }
 
-export const schemaArg = z
-  .string()
-  .optional()
-  .describe("Schema (owner) alvo. Se omitido, busca em todos os schemas acessíveis.");
+/**
+ * Linhas em formato colunar: os nomes das colunas aparecem uma vez, não por linha.
+ * Corta ~50% dos tokens de uma listagem grande. Aplica teto e sinaliza o corte.
+ * ponytail: sem cursor — refine schema/pattern ou suba limit.
+ */
+export function tabular(rows: readonly object[], limit = 200) {
+  const shown = rows.slice(0, limit) as Record<string, unknown>[];
+  // União das chaves: providers podem omitir campos opcionais em algumas linhas.
+  const cols = [...new Set(shown.flatMap((r) => Object.keys(r)))];
+  return {
+    cols,
+    rows: shown.map((r) => cols.map((c) => r[c] ?? null)),
+    count: shown.length,
+    ...(rows.length > limit ? { total: rows.length, truncated: true } : {}),
+  };
+}
 
-export const patternArg = z
-  .string()
-  .optional()
-  .describe("Substring do nome a filtrar (case-insensitive). Omitir = todos.");
+// Args compartilhados: o texto de cada um é serializado em TODA tool que o usa
+// (20x para connectionArg), então cada palavra aqui custa 20 vezes no tools/list.
+export const limitArg = z.number().int().positive().optional().describe("Máx. linhas (default 200).");
 
-export const connectionArg = z
-  .string()
-  .optional()
-  .describe("Nome da conexão alvo. Necessário se houver múltiplas conexões configuradas.");
+export const schemaArg = z.string().optional().describe("Schema/owner. Omitir = todos.");
+
+export const patternArg = z.string().optional().describe("Substring do nome (case-insensitive).");
+
+export const connectionArg = z.string().optional().describe("Conexão alvo (se houver várias).");

@@ -3,6 +3,21 @@
 Todas as tools retornam **JSON estruturado** (em `content[].text`), pensado para consumo
 por outro agente de IA — não para leitura humana direta.
 
+## Formato colunar
+
+Toda tool que devolve linhas usa formato **colunar**: os nomes das colunas aparecem uma vez,
+não em cada linha. Corta ~40% dos tokens de uma listagem.
+
+```json
+{ "cols": ["owner", "tableName", "numRows"],
+  "rows": [["HR", "EMP", 14], ["HR", "DEPT", 4]],
+  "count": 2 }
+```
+
+Quando o resultado passa do teto (`limit`, default **200**), vêm também `total` (quantas
+linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern` ou suba
+`limit`. Não há cursor.
+
 > **Segurança:** nenhuma tool retorna credenciais. `list_connections` devolve só os *nomes*
 > das conexões — nunca `user`, `password` ou `connectString`. Segredos ficam fora do output
 > das tools e, com `${VAR}`, fora do próprio `connections.json`.
@@ -10,19 +25,19 @@ por outro agente de IA — não para leitura humana direta.
 | Tool | O que faz | Parâmetros |
 |---|---|---|
 | `list_connections` | Lista os **nomes** das conexões mapeadas (sem credenciais) | - |
-| `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?` |
-| `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
-| `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera/reaproveita a interface `.ts` em cache. Se o cache está fresco, retorna enxuto (`cached:true`, `cacheFile`, `columnCount`) — **leia o `.ts`** | `table`, `schema?`, `force?` |
-| `list_views` | Lista views (owner, nome) | `schema?`, `pattern?` |
-| `describe_view` | Colunas (tipo, nullable, comentário) e o SELECT que define a view; gera/reaproveita a interface `.ts` em cache. Cache fresco → retorno enxuto (`cached:true`, `cacheFile`) | `view`, `schema?`, `force?` |
-| `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema | `schema?`, `includeViews?`, `force?` |
-| `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia) | `table`, `schema?` |
-| `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?` |
+| `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?`, `pattern?`, `limit?` |
+| `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?`, `limit?` |
+| `describe_table` | Grava a interface `.ts` da tabela em cache (colunas, PK, FKs, índices, CHECK, comentários) e devolve **só o ponteiro** (`cacheFile`, `owner`, `tableName`, `columnCount`) — **leia o `.ts`**. `force` refaz o describe, mas o retorno continua sendo o ponteiro | `table`, `schema?`, `force?` |
+| `list_views` | Lista views (owner, nome) | `schema?`, `pattern?`, `limit?` |
+| `describe_view` | Igual ao `describe_table`, para views. O SELECT que define a view sai por `get_ddl` | `view`, `schema?`, `force?` |
+| `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema. Devolve contagens + `cacheDir` (sem lista de arquivos) | `schema?`, `includeViews?`, `force?` |
+| `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia), cada um em bloco colunar | `table`, `schema?` |
+| `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?`, `limit?` |
 | `get_ddl` | DDL de objetos. Oracle: via `DBMS_METADATA`. Postgres: table (reconstruída), view e function. MySQL: table e view (nativo) | `name`, `schema?`, `objectType?` |
-| `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?` |
-| `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?` |
-| `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?` |
-| `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`, limita linhas | `sql`, `maxRows?` |
+| `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?`, `limit?` |
+| `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?`, `limit?` |
+| `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?`, `limit?` |
+| `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`. Corte em `maxRows` vem marcado com `truncated` | `sql`, `maxRows?` |
 | `pg_monitor` | **Só Postgres.** Monitoramento (leitura): sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação. Escolha a métrica em `check` (ver abaixo) | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `READ_ONLY=false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle.** Monitoramento (leitura): sessões, locks, top SQL, tablespace/segments, cache, índices, redo, Data Guard. Escolha a métrica em `check` (ver abaixo). Exige `SELECT_CATALOG_ROLE` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
@@ -35,12 +50,13 @@ por outro agente de IA — não para leitura humana direta.
 - **`schema`** (opcional): escopa a um owner/schema específico. Omitido = todos os schemas
   acessíveis (Oracle: exclui os mantidos pela Oracle; Postgres: exclui `pg_*` e `information_schema`).
 - **`pattern`** (opcional nas listagens): substring do nome, case-insensitive.
+- **`limit`** (opcional nas listagens): teto de linhas, default 200. Ver *Formato colunar*.
 
 ## Capability flag
 
 Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo
-`supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, ... }`
-com lista vazia — sem erro. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false`
+`supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, "engine": ... }`
+— sem erro e sem bloco colunar. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false`
 (não há packages PL/SQL nem scheduler nativo). No MySQL, `list_packages` é `false` mas
 `list_schedulers_jobs` é `true` (mapeado para MySQL Events).
 
@@ -125,7 +141,7 @@ comentário do objeto, PK, `UNIQUE`, `CHECK`, relacionamentos e o comentário de
 **incremental**: o builder valida o hash criptográfico do conteúdo novo e só reescreve no disco
 se houver mudança.
 
-**Consumo (fast-path):** antes do describe completo, `describe_table`/`describe_view` fazem **uma** query barata para obter o token de frescor do objeto (Oracle: `last_ddl_time`; MySQL: `COALESCE(UPDATE_TIME, CREATE_TIME)`; Postgres: `md5` de uma assinatura do catálogo). Se bate com o `// fresh:` do `.ts` (**HIT**), a tool pula o describe e retorna enxuto — `{ "cached": true, "cacheFile", "owner", "tableName"/"viewName", "columnCount" }`; **leia o `.ts`** para o schema. Em **MISS** (token diferente, arquivo ausente, cache legado sem `// fresh:`, ou engine sem sinal), roda o describe completo, reescreve o cache e devolve o `TableSchema` inline com `"cached": false` e `cacheFile`. As respostas agora são **JSON compacto**.
+**Consumo (fast-path):** antes do describe completo, `describe_table`/`describe_view` fazem **uma** query barata para obter o token de frescor do objeto (Oracle: `last_ddl_time`; MySQL: `COALESCE(UPDATE_TIME, CREATE_TIME)`; Postgres: `md5` de uma assinatura do catálogo). Se bate com o `// fresh:` do `.ts` (**HIT**), a tool pula o describe e retorna enxuto — `{ "cached": true, "cacheFile", "owner", "tableName"/"viewName", "columnCount" }`; **leia o `.ts`** para o schema. Em **MISS** (token diferente, arquivo ausente, cache legado sem `// fresh:`, ou engine sem sinal), roda o describe completo, reescreve o cache e devolve **o mesmo ponteiro** com `"cached": false`. O schema nunca vem inline — está no `.ts`. As respostas são **JSON compacto**.
 
 Passe `force: true` (ou `--force` no CLI) para ignorar o cache e refazer o describe completo.
 
