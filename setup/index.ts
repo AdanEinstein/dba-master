@@ -55,6 +55,27 @@ function shellRcPath(): string {
   return resolve(homedir(), ".profile");
 }
 
+// Versão atual do pacote (dev: __dirname=setup/, build: __dirname=dist/setup/).
+function getCurrentVersion(): string {
+  for (const p of [resolve(__dirname, "..", "package.json"), resolve(__dirname, "..", "..", "package.json")]) {
+    if (fs.existsSync(p)) {
+      try { return JSON.parse(fs.readFileSync(p, "utf8")).version ?? "0.0.0"; } catch { /* tenta próximo candidato */ }
+    }
+  }
+  return "0.0.0";
+}
+
+// Compara versões "major.minor.patch": <0 se a<b, 0 se iguais, >0 se a>b.
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 // true se o valor já é uma referência ${VAR} (não é plaintext a converter/persistir).
 const isRef = (s?: string): boolean => typeof s === "string" && /^\$\{\w+\}$/.test(s);
 // Tag que marca as linhas de uma conexão no rc, p/ upsert e remoção idempotentes.
@@ -328,6 +349,21 @@ export async function runInstaller() {
     ? resolve(homedir(), ".dba-master")
     : resolve(process.cwd(), ".dba-master");
 
+  const versionFile = resolve(dbaMasterDir, ".version");
+  const currentVersion = getCurrentVersion();
+
+  if (fs.existsSync(versionFile)) {
+    const installedVersion = fs.readFileSync(versionFile, "utf8").trim();
+    if (compareVersions(installedVersion, currentVersion) < 0) {
+      const update = await confirm({
+        message: `dba-master v${installedVersion} já está instalado neste escopo. Versão atual é v${currentVersion}. Deseja atualizar?`,
+        initialValue: true
+      });
+      if (isCancel(update)) { cancel("Cancelado"); process.exit(0); }
+      if (!update) { cancel("Instalação cancelada."); process.exit(0); }
+    }
+  }
+
   if (!fs.existsSync(dbaMasterDir)) {
     fs.mkdirSync(dbaMasterDir, { recursive: true });
   }
@@ -360,6 +396,8 @@ export async function runInstaller() {
       failedAgents.push({ agent, error: e });
     }
   }
+
+  fs.writeFileSync(versionFile, currentVersion);
 
   if (failedAgents.length === 0) {
     s.stop("Agentes configurados com sucesso!");
