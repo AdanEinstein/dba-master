@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, tabular } from "../shared.js";
 
 // Monitoramento Oracle: uma tool, muitos "checks". Cada check é um SELECT fixo
 // sobre v$/dba_* (nada vem do usuário → seguro por construção).
@@ -233,23 +233,13 @@ export function buildMonitorSql(check: OracleCheck, opts: MonitorOpts = {}): str
   return sql;
 }
 
-const CHECK_DESC =
-  "Métrica a coletar. Atividade: active_queries, all_activity, long_transactions. " +
-  "Sessões: sessions_by_state, connections_by_source, connections_usage, idle_in_transaction. " +
-  "Locks: blocking_locks, locks_detail, deadlocks. Queries: top_queries (v$sqlarea). " +
-  "Storage: tablespace_usage, segment_sizes, table_sizes, stale_stats. " +
-  "Cache: cache_hit, library_cache. Índices: unused_indexes (12.2+), full_scans. " +
-  "Redo: redo_stats, log_switches. Data Guard: dataguard_stats, archive_dest.";
-
 export function register(server: McpServer, provider: ProviderManager): void {
   server.registerTool(
     "ora_monitor",
     {
       title: "Monitorar Oracle",
       description:
-        "Monitoramento Oracle (somente leitura): sessões, locks, top SQL, tablespace/segments, " +
-        "cache hit, índices, redo e Data Guard. Escolha a métrica pelo parâmetro 'check'. Só engine Oracle. " +
-        "Exige SELECT_CATALOG_ROLE (v$/dba_*).",
+        "Monitoramento Oracle (leitura). Só engine Oracle; exige SELECT_CATALOG_ROLE (v$/dba_*).",
       inputSchema: z.object({
         connectionName: connectionArg,
         check: z
@@ -264,18 +254,18 @@ export function register(server: McpServer, provider: ProviderManager): void {
             "redo_stats", "log_switches",
             "dataguard_stats", "archive_dest",
           ])
-          .describe(CHECK_DESC),
+          .describe("Métrica a coletar."),
         limit: z.number().int().positive().optional().describe("Só top_queries: nº de queries (default 5)."),
         orderBy: z
           .enum(["total", "mean", "io"])
           .optional()
-          .describe("Só top_queries: total (elapsed agregado, default), mean (média por execução) ou io (buffer gets)."),
+          .describe("Só top_queries: elapsed agregado (default), média por execução ou buffer gets."),
         idleMinutes: z
           .number()
           .int()
           .positive()
           .optional()
-          .describe("Só idle_in_transaction: minutos mínimos ocioso com transação aberta (default 5)."),
+          .describe("Só idle_in_transaction: minutos mínimos ocioso (default 5)."),
       }),
     },
     async ({ connectionName, check, limit, orderBy, idleMinutes }) => {
@@ -285,7 +275,7 @@ export function register(server: McpServer, provider: ProviderManager): void {
           throw new Error(`ora_monitor só suporta Oracle; a conexão usa engine '${db.engine}'.`);
         }
         const sql = buildMonitorSql(check as OracleCheck, { limit, orderBy, idleMinutes });
-        return jsonResult({ check, ...(await db.runSql(sql, 1000)) });
+        return jsonResult({ check, ...tabular((await db.runSql(sql, 1000)).rows ?? []) });
       } catch (e) {
         return errorResult(e);
       }

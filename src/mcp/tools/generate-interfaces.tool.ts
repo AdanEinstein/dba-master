@@ -12,7 +12,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     {
       title: "Gerar interfaces (lote)",
       description:
-        "Varre todas as tabelas (e views) do schema e gera/atualiza suas interfaces .ts em cache. Incremental: pula objetos inalterados.",
+        "Gera/atualiza em lote as interfaces .ts de todas as tabelas (e views) do schema. Incremental.",
       inputSchema: z.object({
         connectionName: connectionArg,
         schema: schemaArg,
@@ -30,7 +30,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
           tables: r.tables,
           views: r.views,
           cacheDir: cfg.cacheDir,
-          sample: r.files.slice(0, 50),
+          // ponytail: sem lista de arquivos — cacheDir + contagens bastam; liste o dir se precisar.
           errors: r.errors,
         });
       } catch (e) {

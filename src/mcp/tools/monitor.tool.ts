@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
 import type { DatabaseProvider } from "../../domain/database-provider.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, tabular } from "../shared.js";
 
 // Monitoramento Postgres: uma tool, muitos "checks". Cada check é um
 // SELECT fixo sobre pg_stat_*/pg_catalog (nada vem do usuário → seguro por construção).
@@ -253,22 +253,13 @@ async function pgVersionNum(db: DatabaseProvider): Promise<number> {
   return Number(r.rows?.[0]?.v ?? 0);
 }
 
-const CHECK_DESC =
-  "Métrica a coletar. Atividade: active_queries, all_activity, long_transactions. " +
-  "Sessões: sessions_by_state, connections_by_source, connections_usage, idle_in_transaction. " +
-  "Locks: blocking_locks, locks_detail, deadlocks. Queries: top_queries (exige extensão pg_stat_statements). " +
-  "Vacuum: vacuum_progress, dead_tuples, wraparound, autovacuum_config. " +
-  "Storage: table_sizes, database_sizes, cache_hit. Índices: unused_indexes, seq_scans, index_cache_hit. " +
-  "WAL: wal_stats, checkpoints. Replicação: replication, replication_slots, publications, subscriptions.";
-
 export function register(server: McpServer, provider: ProviderManager): void {
   server.registerTool(
     "pg_monitor",
     {
       title: "Monitorar Postgres",
       description:
-        "Monitoramento Postgres (somente leitura): sessões, locks, vacuum, bloat, índices, " +
-        "cache hit, WAL/checkpoints e replicação. Escolha a métrica pelo parâmetro 'check'. Só engine Postgres.",
+        "Monitoramento Postgres (leitura). Só engine Postgres. top_queries exige pg_stat_statements.",
       inputSchema: z.object({
         connectionName: connectionArg,
         check: z
@@ -283,12 +274,12 @@ export function register(server: McpServer, provider: ProviderManager): void {
             "wal_stats", "checkpoints",
             "replication", "replication_slots", "publications", "subscriptions",
           ])
-          .describe(CHECK_DESC),
+          .describe("Métrica a coletar."),
         limit: z.number().int().positive().optional().describe("Só top_queries: nº de queries (default 5)."),
         orderBy: z
           .enum(["total", "mean", "max"])
           .optional()
-          .describe("Só top_queries: total (I/O+CPU agregado, default), mean (média por chamada) ou max (pior tempo)."),
+          .describe("Só top_queries: agregado (default), média por chamada ou pior tempo."),
         idleMinutes: z
           .number()
           .int()
@@ -305,7 +296,7 @@ export function register(server: McpServer, provider: ProviderManager): void {
         }
         const versionNum = VERSION_CHECKS.has(check as MonitorCheck) ? await pgVersionNum(db) : 0;
         const sql = buildMonitorSql(check as MonitorCheck, { limit, orderBy, idleMinutes }, versionNum);
-        return jsonResult({ check, ...(await db.runSql(sql, 1000)) });
+        return jsonResult({ check, ...tabular((await db.runSql(sql, 1000)).rows ?? []) });
       } catch (e) {
         return errorResult(e);
       }

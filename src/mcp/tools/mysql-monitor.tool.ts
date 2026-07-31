@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, tabular } from "../shared.js";
 
 export type MysqlMonitorCheck =
   | "active_queries" | "all_activity" | "long_transactions"
@@ -71,7 +71,7 @@ export function register(server: McpServer, provider: ProviderManager): void {
         }
         const sqlFn = CHECKS[check as MysqlMonitorCheck];
         if (!sqlFn) throw new Error(`Check desconhecido: ${check}`);
-        return jsonResult(await db.runSql(sqlFn(), 100));
+        return jsonResult({ check, ...tabular((await db.runSql(sqlFn(), 100)).rows ?? []) });
       } catch (e) {
         return errorResult(e);
       }

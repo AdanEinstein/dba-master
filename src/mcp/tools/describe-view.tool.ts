@@ -12,7 +12,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
     {
       title: "Descrever view",
       description:
-        "Detalha uma view: colunas (tipo, nullable) e o SELECT que a define. Gera/atualiza a interface .ts em cache. Se o cache está fresco, retorna enxuto apontando o .ts (leia o arquivo). Use force=true p/ forçar o describe completo.",
+        "Grava em cache a interface .ts da view (colunas) e retorna o caminho — leia o arquivo. Para o SELECT que a define, use get_ddl.",
       inputSchema: z.object({
         connectionName: connectionArg,
         view: z.string().describe("Nome da view."),
@@ -42,7 +42,11 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
           cfg.cacheDir, resolvedName, s.owner, s.viewName, s.columns, db.typeToTs.bind(provider),
           { kind: "view", lastDdlTime: s.lastDdlTime, comment: s.comment, freshToken: fresh?.token },
         );
-        return jsonResult({ ...s, cacheFile, cached: false });
+        // Só o ponteiro, igual ao cache-hit. O SQL da view sai por get_ddl.
+        return jsonResult({
+          cached: false, cacheFile,
+          owner: s.owner, viewName: s.viewName, columnCount: s.columns.length,
+        });
       } catch (e) {
         return errorResult(e);
       }

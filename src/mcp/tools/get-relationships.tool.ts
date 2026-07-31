@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
-import { jsonResult, errorResult, schemaArg , connectionArg } from "../shared.js";
+import { jsonResult, errorResult, schemaArg, connectionArg, tabular } from "../shared.js";
 
 export function register(server: McpServer, provider: ProviderManager): void {
   server.registerTool(
@@ -18,7 +18,11 @@ export function register(server: McpServer, provider: ProviderManager): void {
       const db = provider.getProvider(connectionName);
 
       try {
-        return jsonResult(await db.getRelationships(table, schema));
+        const r = await db.getRelationships(table, schema);
+        return jsonResult({
+          owner: r.owner, tableName: r.tableName,
+          outgoing: tabular(r.outgoing), incoming: tabular(r.incoming),
+        });
       } catch (e) {
         return errorResult(e);
       }
