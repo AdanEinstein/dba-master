@@ -1,7 +1,7 @@
 # Instalação nos agentes de IA
 
 Duas vias combináveis, ambas subcomandos da própria bin (via `npx`, sem o repo), para
-`claude` · `copilot` · `opencode` · `antigravity`. Detalhes completos em
+`claude` · `copilot` · `opencode` · `antigravity` · `cursor`. Detalhes completos em
 [../agents/INSTALL.md](../agents/INSTALL.md).
 
 ## Instalador Unificado (Interativo)
@@ -14,7 +14,8 @@ npx -y dba-master@latest install
 
 Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
 (`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
-(`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`).
+(`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`), Cursor
+(`~/.cursor/mcp.json`).
 As skills `dba-investigate`, `dba-wiring`, `dba-legacy-map`, `dba-reprocessor`, `dba-script-gen`, `dba-pg-monitor` e `dba-ora-monitor` também serão posicionadas nos diretórios de configuração apropriados para o agente escolhido:
 
 - `dba-investigate` — investiga o schema (do estreito ao amplo) e propõe queries/modelagem/diagnóstico.

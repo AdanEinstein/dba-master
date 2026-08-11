@@ -62,6 +62,8 @@ const withFm = (dest: string, c: Command) =>
   write(dest, `---\ndescription: ${JSON.stringify(c.desc)}\n---\n\n${body(c.cmd)}`);
 const withSkill = (dest: string, c: Command) =>
   write(dest, `---\nname: ${c.cmd}\ndescription: ${JSON.stringify(c.desc)}\n---\n\n${body(c.cmd)}`);
+// Cursor commands não suportam frontmatter — corpo puro, senão o "---" vira texto literal no prompt.
+const withPlain = (dest: string, c: Command) => write(dest, body(c.cmd));
 
 const AGENTS: Record<string, (c: Command, global: boolean) => void> = {
   claude(c, global) {
@@ -98,6 +100,12 @@ const AGENTS: Record<string, (c: Command, global: boolean) => void> = {
       withSkill(destWorkspace, c);
       console.log(`✓ Antigravity (Workspace) → ${destWorkspace}`);
     }
+  },
+  cursor(c, global) {
+    const base = global ? homedir() : process.cwd();
+    const dest = join(base, ".cursor", "commands", `${c.cmd}.md`);
+    withPlain(dest, c);
+    console.log(`✓ Cursor       → ${dest}`);
   },
 };
 
@@ -152,6 +160,10 @@ const UNINSTALL_AGENTS_SKILL: Record<string, (cmd: string, global: boolean) => v
     } else {
       removeDir(join(process.cwd(), ".agents", "skills", cmd));
     }
+  },
+  cursor(cmd, global) {
+    const base = global ? homedir() : process.cwd();
+    removeFile(join(base, ".cursor", "commands", `${cmd}.md`));
   },
 };
 

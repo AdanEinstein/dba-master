@@ -7,7 +7,7 @@ Instala o **dba-master** num agente de IA, em duas vias independentes (combináv
    para investigar o schema e propor soluções.
 
 Ambas as vias são **subcomandos da própria bin** (via `npx`, sem clonar o repo), cobrindo
-4 agentes: `claude` · `copilot` · `opencode` · `antigravity`. Qualquer outro cliente MCP
+5 agentes: `claude` · `copilot` · `opencode` · `antigravity` · `cursor`. Qualquer outro cliente MCP
 funciona manualmente (ver fim) — o server é STDIO padrão.
 
 ## Instalação Unificada (Interativa)
@@ -21,7 +21,7 @@ npx -y dba-master@latest install
 Siga as instruções na tela para:
 1. Configurar, usar, editar ou gerenciar (excluir) conexões de banco de dados (salvas em `connections.json`).
 2. Escolher o escopo da instalação: **Global** (para todos os projetos) ou **Project scoped** (apenas para o projeto atual).
-3. Selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity).
+3. Selecionar os agentes desejados (Claude, Copilot, Opencode, Antigravity, Cursor).
 
 ### Destinos do config (Global vs Project scoped)
 
@@ -34,6 +34,7 @@ Dependendo do escopo escolhido, os arquivos de configuração (ex: `mcpServers`)
 | Copilot CLI     | `~/.copilot/mcp-config.json` / `./.copilot/mcp-config.json` | `~/.copilot/skills/dba-investigate/SKILL.md` / `./.copilot/...` |
 | Opencode        | `~/.config/opencode/opencode.json` / `./.opencode/opencode.json` | `~/.config/opencode/command/...` / `./.opencode/command/...` |
 | Antigravity     | `~/.gemini/config/mcp_config.json` / `./.agents/mcp_config.json` | `~/.gemini/skills/dba-investigate/SKILL.md` / `./.agents/skills/dba-investigate/SKILL.md` |
+| Cursor          | `~/.cursor/mcp.json` / `./.cursor/mcp.json` | `~/.cursor/commands/dba-investigate.md` / `./.cursor/commands/dba-investigate.md` |
 
 **Claude Code** — alternativa via CLI (credenciais no `connections.json`, via `npx -y dba-master configure`):
 ```bash
@@ -48,7 +49,7 @@ O `dba-master` lê nativamente suas credenciais a partir de `.dba-master/connect
 { "command": "npx", "args": ["-y", "dba-master@latest"] }
 ```
 
-Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli), `servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
+Chave do bloco varia por agente: `mcpServers` (claude/antigravity/copilot-cli/cursor), `servers`+`type:stdio` (copilot/claude vscode), `mcp`+`type:local` (opencode).
 
 > Antigravity sem `~/.gemini`: crie o workflow pela UI (Customizations → Workflows) com o conteúdo de `agents/commands/dba-investigate.md`.
 

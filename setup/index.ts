@@ -314,6 +314,7 @@ const AGENT_OPTIONS = [
   { value: "copilot", label: "Copilot CLI", hint: "GitHub Copilot" },
   { value: "opencode", label: "Opencode", hint: "opencode.ai" },
   { value: "antigravity", label: "Antigravity", hint: "Antigravity IDE" },
+  { value: "cursor", label: "Cursor", hint: "Cursor IDE" },
 ];
 const SCOPE_OPTIONS = [
   { value: "project", label: "Projeto — pasta atual", hint: "./.dba-master" },

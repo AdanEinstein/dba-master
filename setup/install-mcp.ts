@@ -71,13 +71,21 @@ const AGENTS: Record<string, (global: boolean) => void> = {
     console.log(`✓ Opencode        → ${f}`);
   },
   antigravity(global) {
-    const f = global 
+    const f = global
       ? join(homedir(), ".gemini", "config", "mcp_config.json")
       : join(process.cwd(), ".agents", "mcp_config.json");
     updateJson(f, (d) => {
       bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS };
     });
     console.log(`✓ Antigravity     → ${f}`);
+  },
+  cursor(global) {
+    const base = global ? homedir() : process.cwd();
+    const f = join(base, ".cursor", "mcp.json");
+    updateJson(f, (d) => {
+      bag(d, "mcpServers")[KEY] = { command: COMMAND, args: ARGS };
+    });
+    console.log(`✓ Cursor          → ${f}`);
   },
 };
 
@@ -137,11 +145,17 @@ const UNINSTALL_AGENTS: Record<string, (global: boolean) => void> = {
     console.log(`✓ Removido do Opencode        → ${f}`);
   },
   antigravity(global) {
-    const f = global 
+    const f = global
       ? join(homedir(), ".gemini", "config", "mcp_config.json")
       : join(process.cwd(), ".agents", "mcp_config.json");
     removeFromJson(f, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
     console.log(`✓ Removido do Antigravity     → ${f}`);
+  },
+  cursor(global) {
+    const base = global ? homedir() : process.cwd();
+    const f = join(base, ".cursor", "mcp.json");
+    removeFromJson(f, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+    console.log(`✓ Removido do Cursor          → ${f}`);
   },
 };
 

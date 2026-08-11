@@ -50,7 +50,7 @@ npx -y dba-master@latest install
 O comando abrirá uma interface interativa onde você poderá:
 - Criar, editar, excluir ou usar conexões com bancos de dados.
 - Selecionar se deseja instalação com **escopo de projeto** (na pasta atual) ou **global** (na home).
-- Selecionar quais agentes de IA deseja configurar (Claude, Copilot, Opencode, Antigravity).
+- Selecionar quais agentes de IA deseja configurar (Claude, Copilot, Opencode, Antigravity, Cursor).
 
 As credenciais e conexões configuradas serão salvas no arquivo `connections.json` (dentro da pasta `.dba-master` do seu projeto ou globalmente em `~/.dba-master/`).
 
