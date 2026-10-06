@@ -23,7 +23,7 @@ métrica pelo parâmetro `check`.
    - Índices → `unused_indexes` (candidatos a DROP — nunca dropar PK/UNIQUE), `seq_scans` (candidatos a indexar).
    - Réplica atrasada / storage enchendo → `replication`, `replication_slots` (slot `active=false` retém WAL), `publications`, `subscriptions`.
 2. **Correlacione.** Ex.: transação longa (`long_transactions`) explica dead tuples que não são limpos e WAL retido; `idle_in_transaction` explica locks presos.
-3. **Aja só com autorização explícita.** Para matar uma sessão problemática use `pg_kill_session(pid, mode)`: `cancel` (cancela o statement, reversível) antes de `terminate` (derruba a conexão, ROLLBACK). Exige `READ_ONLY=false` na conexão — se recusar, oriente o usuário a ajustar a conexão. Confirme o `pid` (de `active_queries`/`blocking_locks`) e o impacto antes.
+3. **Aja só com autorização explícita.** Para matar uma sessão problemática use `pg_kill_session(pid, mode)`: `cancel` (cancela o statement, reversível) antes de `terminate` (derruba a conexão, ROLLBACK). Exige `readOnly: false` na conexão — se recusar, oriente o usuário a ajustar a conexão. Confirme o `pid` (de `active_queries`/`blocking_locks`) e o impacto antes.
 
 ## Como responder
 1. Fundamente cada diagnóstico no JSON real das tools (cite pid, tabela, lag, pct).

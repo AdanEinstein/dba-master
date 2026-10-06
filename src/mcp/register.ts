@@ -25,7 +25,7 @@ import * as mysqlKillSession from "./tools/mysql-kill-session.tool.js";
 
 /** Registra todas as tools no servidor, injetando o provider (e config onde preciso). */
 export function registerTools(server: McpServer, provider: ProviderManager, cfg: Config): void {
-  listConnections.register(server, provider);
+  listConnections.register(server, provider, cfg);
   listTables.register(server, provider);
   searchTables.register(server, provider);
   describeTable.register(server, provider, cfg);

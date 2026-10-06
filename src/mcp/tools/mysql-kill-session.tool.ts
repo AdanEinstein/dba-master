@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
 import type { Config } from "../../config.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, assertWritable } from "../shared.js";
 
 export function register(server: McpServer, provider: ProviderManager, cfg: Config): void {
   server.registerTool(
@@ -11,7 +11,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
       title: "Encerrar sessão MySQL",
       description:
         "DESTRUTIVO. Cancela a query ou derruba a sessão pelo connection_id. " +
-        "Só MySQL; exige READ_ONLY=false.",
+        "Só MySQL; exige readOnly:false na conexão.",
       inputSchema: z.object({
         connectionName: connectionArg,
         connectionId: z.number().int().describe("ID da conexão (coluna id de mysql_monitor active_queries)."),
@@ -28,9 +28,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
         if (db.engine !== "mysql") {
           throw new Error(`mysql_kill_session só suporta MySQL; a conexão usa engine '${db.engine}'.`);
         }
-        if (cfg.connections[name]?.readOnly !== false) {
-          throw new Error("READ_ONLY ativo: mysql_kill_session exige READ_ONLY=false na conexão.");
-        }
+        assertWritable(cfg, name, "mysql_kill_session");
         const sql = mode === "query" ? `KILL QUERY ${connectionId}` : `KILL CONNECTION ${connectionId}`;
         return jsonResult({ mode, connectionId, ...(await db.runSql(sql, 1)) });
       } catch (e) {

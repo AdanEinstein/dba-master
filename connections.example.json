@@ -13,7 +13,7 @@
     "engine": "postgres",
     "connectString": "${DBA_MY_PG_CS}",
     "poolMax": 8,
-    "readOnly": true,
+    "readOnly": false,
     "schemaFilter": ["public"]
   },
   "via_bastion": {

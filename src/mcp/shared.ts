@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Config } from "../config.js";
 
 // Utilidades compartilhadas pelas tools: envelope de resposta e args comuns.
 
@@ -6,6 +7,19 @@ import { z } from "zod";
 export function jsonResult(data: unknown) {
   // ponytail: JSON compacto (sem pretty-print) — corta ~30% de tokens em toda resposta.
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+}
+
+/**
+ * Guarda de escrita por conexão: só o booleano literal `readOnly: false` libera.
+ * Ausente (default true), true ou qualquer outro valor (ex. "false" string) bloqueia.
+ */
+export function assertWritable(cfg: Config, name: string, what: string): void {
+  if (cfg.connections[name]?.readOnly !== false) {
+    throw new Error(
+      `Conexão "${name}" é read-only: ${what} bloqueado. Para liberar só esta conexão, ` +
+        `defina "readOnly": false nela (connections.json ou "npx dba-master configure" → editar).`,
+    );
+  }
 }
 
 export function errorResult(err: unknown) {

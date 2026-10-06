@@ -2,10 +2,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
 import type { Config } from "../../config.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, assertWritable } from "../shared.js";
 
 // Ação destrutiva de firefighting: cancela (statement) ou termina (conexão) um backend.
-// Mesma guarda read-only de run_sql — só roda com READ_ONLY=false na conexão.
+// Mesma guarda read-only de run_sql — só roda com readOnly:false na conexão.
 export function register(server: McpServer, provider: ProviderManager, cfg: Config): void {
   server.registerTool(
     "pg_kill_session",
@@ -13,7 +13,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
       title: "Encerrar sessão Postgres",
       description:
         "DESTRUTIVO. Cancela o statement ou derruba a sessão (ROLLBACK) pelo pid. " +
-        "Só Postgres; exige READ_ONLY=false.",
+        "Só Postgres; exige readOnly:false na conexão.",
       inputSchema: z.object({
         connectionName: connectionArg,
         pid: z.number().int().describe("pid do backend (coluna pid de pg_monitor)."),
@@ -30,9 +30,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
         if (db.engine !== "postgres") {
           throw new Error(`pg_kill_session só suporta Postgres; a conexão usa engine '${db.engine}'.`);
         }
-        if (cfg.connections[name]?.readOnly !== false) {
-          throw new Error("READ_ONLY ativo: pg_kill_session exige READ_ONLY=false na conexão.");
-        }
+        assertWritable(cfg, name, "pg_kill_session");
         // pid é int validado por zod; mode vem de enum → SQL fixo, sem injeção.
         const fn = mode === "terminate" ? "pg_terminate_backend" : "pg_cancel_backend";
         return jsonResult({ mode, pid, ...(await db.runSql(`SELECT ${fn}(${pid}) AS ok`, 1)) });

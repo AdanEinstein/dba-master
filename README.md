@@ -127,7 +127,7 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
 
 Os valores também podem ser gravados em texto plano direto no JSON (menos seguro). Se uma `${VAR}` referenciada não existir no ambiente, o server falha no boot nomeando a var. No Postgres, `user`/`password` vêm embutidos na URL da `connectString` (como no exemplo `pg` acima).
 
-Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
+Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). O `configure` também pergunta, por conexão, se ela aceita escrita (`readOnly: false`; default não) — e a opção "Definir quais conexões aceitam escrita" troca isso em uma tela só, sem repassar credenciais. Para ajustar `schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
@@ -137,7 +137,7 @@ Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master
 | `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
 | `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
-| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
+| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql` e os `*_kill_session` **desta conexão**; só `false` (booleano) libera. Leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; vazio (`[]`, default) = todos os schemas de usuário. Oracle: nomes em MAIÚSCULO (exclui os mantidos pela Oracle); Postgres: nomes como `public` (exclui `pg_*` e `information_schema`) |
 | `tunnel` | não | Túnel/proxy quando o banco só é acessível via bastion. Ver abaixo |
 
@@ -233,7 +233,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 
 | Tool | O que faz | Parâmetros |
 |---|---|---|
-| `list_connections` | Lista as conexões mapeadas configuradas no dba-master | - |
+| `list_connections` | Lista as conexões mapeadas; `writable` = as com `readOnly: false` | - |
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `connectionName`, `schema?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?` |
 | `describe_table` | Colunas (tipo, nullable, default, comentário), PK, FKs de saída, índices, CHECK, comentário da tabela; gera interface `.ts` | `table`, `schema?` |
@@ -248,11 +248,11 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
 | `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
 | `pg_monitor` | **Só Postgres, leitura.** Monitoramento: sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
-| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `READ_ONLY=false` | `pid`, `mode?` |
+| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `readOnly: false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle, leitura.** Monitoramento: sessões, locks, top SQL, tablespace, cache, índices, redo, Data Guard — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
-| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`; exige `READ_ONLY=false` + `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
+| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`; exige `readOnly: false` na conexão + `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
 | `mysql_monitor` | **Só MySQL, leitura.** Monitoramento: sessões, locks, transações longas, top queries (performance_schema), engine status — via `check` | `check` |
-| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela a query ou derruba a conexão por `connectionId`; exige `READ_ONLY=false` | `connectionId`, `mode?` |
+| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela a query ou derruba a conexão por `connectionId`; exige `readOnly: false` na conexão | `connectionId`, `mode?` |
 
 **Parâmetros comuns:**
 - **`connectionName`** (opcional): O nome da conexão mapeada para usar (ex: `prod`, `default`). Necessário quando há mais de uma conexão listada por `list_connections`.
@@ -265,7 +265,7 @@ Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem u
 
 ### `run_sql` e o modo read-only
 
-Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
+O modo é **por conexão**: cada uma é read-only por padrão e só as marcadas com `"readOnly": false` aceitam escrita. Com `readOnly: true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário Oracle read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).
 
 ### Monitoramento Postgres (`pg_monitor` / `pg_kill_session`)
 

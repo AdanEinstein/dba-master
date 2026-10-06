@@ -26,7 +26,7 @@ conceder o grant.
    - Índices → `unused_indexes` (candidatos a DROP — nunca dropar PK/UNIQUE; exige 12.2+), `full_scans`.
    - Standby atrasado → `dataguard_stats` (apply/transport lag), `archive_dest` (destino em erro).
 2. **Correlacione.** Ex.: `long_transactions`/`idle_in_transaction` explica locks presos e undo crescendo; `stale_stats` explica plano ruim que aparece em `top_queries`.
-3. **Aja só com autorização explícita.** Para encerrar uma sessão problemática use `ora_kill_session(sid, serial, mode)`: `cancel` (cancela só o SQL, 19c+, reversível) antes de `kill` (derruba a sessão, ROLLBACK). Exige `READ_ONLY=false` na conexão e privilégio `ALTER SYSTEM` — se recusar, oriente o usuário a ajustar. Confirme `sid`+`serial` (de `active_queries`/`blocking_locks`) e o impacto antes.
+3. **Aja só com autorização explícita.** Para encerrar uma sessão problemática use `ora_kill_session(sid, serial, mode)`: `cancel` (cancela só o SQL, 19c+, reversível) antes de `kill` (derruba a sessão, ROLLBACK). Exige `readOnly: false` na conexão e privilégio `ALTER SYSTEM` — se recusar, oriente o usuário a ajustar. Confirme `sid`+`serial` (de `active_queries`/`blocking_locks`) e o impacto antes.
 
 ## Como responder
 1. Fundamente cada diagnóstico no JSON real das tools (cite sid, tablespace, lag, pct).

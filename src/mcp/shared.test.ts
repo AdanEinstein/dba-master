@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tabular } from "./shared.js";
+import { tabular, assertWritable } from "./shared.js";
+import type { Config } from "../config.js";
 
 test("tabular: lista vazia", () => {
   assert.deepEqual(tabular([]), { cols: [], rows: [], count: 0 });
@@ -33,4 +34,20 @@ test("tabular: colunas são a união das chaves, na mesma ordem em toda linha", 
 test("tabular: só considera as chaves das linhas exibidas", () => {
   const r = tabular([{ a: 1 }, { z: 9 }], 1);
   assert.deepEqual(r.cols, ["a"]);
+});
+
+test("assertWritable: só readOnly === false libera escrita", () => {
+  const cfg = {
+    cacheDir: "",
+    connections: {
+      rw: { readOnly: false },
+      ro: { readOnly: true },
+      dflt: {},
+      str: { readOnly: "false" },
+    },
+  } as unknown as Config;
+  assert.doesNotThrow(() => assertWritable(cfg, "rw", "x"));
+  for (const n of ["ro", "dflt", "str", "inexistente"]) {
+    assert.throws(() => assertWritable(cfg, n, "x"), new RegExp(`Conexão "${n}" é read-only`));
+  }
 });

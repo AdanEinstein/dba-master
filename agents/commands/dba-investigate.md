@@ -27,7 +27,7 @@ comece estreito para não afogar o contexto.
    tool responder `{ "supported": false }`, o banco atual não tem aquele recurso.
 6. **Diagnostique com dados reais.** `run_sql` (somente leitura por padrão) para
    `SELECT`/`WITH` — contagens, distribuição, `EXPLAIN PLAN`, checagem de nulos.
-   Escrita (INSERT/UPDATE/DDL) só se `READ_ONLY=false`.
+   Escrita (INSERT/UPDATE/DDL) só em conexão com `readOnly: false` (veja `writable` em `list_connections`).
 
 ## Como responder
 1. Fundamente cada afirmação e entregue o SQL pronto para uso com nomes reais (cite tabela/coluna/FK).

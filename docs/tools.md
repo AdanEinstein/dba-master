@@ -24,7 +24,7 @@ linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern
 
 | Tool | O que faz | Parâmetros |
 |---|---|---|
-| `list_connections` | Lista os **nomes** das conexões mapeadas (sem credenciais) | - |
+| `list_connections` | Lista os **nomes** das conexões mapeadas (sem credenciais); `writable` = as com `readOnly: false` | - |
 | `list_tables` | Lista tabelas (owner, nome, num_rows) | `schema?`, `pattern?`, `limit?` |
 | `search_tables` | Busca tabelas por substring do nome (case-insensitive) | `pattern`, `schema?`, `limit?` |
 | `describe_table` | Grava a interface `.ts` da tabela em cache (colunas, PK, FKs, índices, CHECK, comentários) e devolve **só o ponteiro** (`cacheFile`, `owner`, `tableName`, `columnCount`) — **leia o `.ts`**. `force` refaz o describe, mas o retorno continua sendo o ponteiro | `table`, `schema?`, `force?` |
@@ -39,11 +39,11 @@ linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?`, `limit?` |
 | `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`. Corte em `maxRows` vem marcado com `truncated` | `sql`, `maxRows?` |
 | `pg_monitor` | **Só Postgres.** Monitoramento (leitura): sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação. Escolha a métrica em `check` (ver abaixo) | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
-| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `READ_ONLY=false` na conexão | `pid`, `mode?` |
+| `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `readOnly: false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle.** Monitoramento (leitura): sessões, locks, top SQL, tablespace/segments, cache, índices, redo, Data Guard. Escolha a métrica em `check` (ver abaixo). Exige `SELECT_CATALOG_ROLE` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
-| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`. Exige `READ_ONLY=false` e `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
+| `ora_kill_session` | **Só Oracle, destrutivo.** Cancela o SQL (`cancel`, 19c+) ou derruba (`kill`) uma sessão por `sid`+`serial`. Exige `readOnly: false` na conexão e `ALTER SYSTEM` | `sid`, `serial`, `mode?` |
 | `mysql_monitor` | **Só MySQL.** Monitoramento (leitura): sessões, locks, transações longas, top queries, engine status. Escolha a métrica em `check` (ver abaixo) | `check` |
-| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela (`query`) ou derruba (`connection`) uma sessão pelo `connectionId`. Exige `READ_ONLY=false` na conexão | `connectionId`, `mode?` |
+| `mysql_kill_session` | **Só MySQL, destrutivo.** Cancela (`query`) ou derruba (`connection`) uma sessão pelo `connectionId`. Exige `readOnly: false` na conexão | `connectionId`, `mode?` |
 
 ## Parâmetros comuns
 
@@ -62,7 +62,8 @@ Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem u
 
 ## `run_sql` e o modo read-only
 
-Com `readOnly: true` na conexão (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita
+O modo é **por conexão**: cada uma é read-only por padrão e só as marcadas com `"readOnly": false`
+aceitam escrita (`list_connections` lista essas em `writable`). Com `readOnly: true` (default), só `SELECT`/`WITH`/`EXPLAIN` passam; escrita
 (INSERT/UPDATE/DELETE/MERGE/DDL) é rejeitada com erro. A verificação é pelo primeiro
 token do statement — é uma guarda, não um parser SQL. Para bloqueio forte, use um usuário
 de banco read-only (`GRANT SELECT`). `maxRows` limita o retorno (default 200).

@@ -67,7 +67,7 @@ conexão` (ver `connections.example.json` na raiz):
 | `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
 | `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
-| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`; leitura sempre liberada |
+| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql` e os `*_kill_session` **desta conexão**; só `false` (booleano) libera. Leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; `[]` (default) = todos os schemas de usuário. Oracle: MAIÚSCULO (exclui mantidos pela Oracle); Postgres: como `public` (exclui `pg_*` e `information_schema`) |
 
 ### Segredos via env var (recomendado)
@@ -96,7 +96,8 @@ do arquivo lido casualmente, mas não impede um processo com o mesmo usuário/sh
 ler o env; para fronteira dura use usuário/container separado ou um keychain do SO.
 
 O cache das interfaces `.ts` não é configurável: é sempre `<pasta do connections.json>/types`
-(ex.: `.dba-master/types`). Para ajustar `readOnly`/`schemaFilter`/`poolMax`, edite o JSON
+(ex.: `.dba-master/types`). O `configure` pergunta, por conexão, se ela
+aceita escrita (`readOnly: false`; default não) — e a opção "Definir quais conexões aceitam escrita" troca isso em uma tela só. Para ajustar `schemaFilter`/`poolMax`, edite o JSON
 manualmente.
 
 ## Registrar num cliente MCP

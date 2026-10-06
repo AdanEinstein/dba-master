@@ -22,7 +22,7 @@ do `information_schema` e `performance_schema` (se habilitado).
    - Storage enchendo → `table_sizes`.
    - Status geral do Engine → `engine_status` (SHOW ENGINE INNODB STATUS).
 2. **Correlacione.** Ex.: `long_transactions` explica locks presos; `top_queries` evidencia gargalos frequentes.
-3. **Aja só com autorização explícita.** Para encerrar uma sessão problemática use `mysql_kill_session(connectionId, mode)`: `query` (cancela só a instrução) ou `connection` (derruba a sessão inteira, ROLLBACK). Exige `READ_ONLY=false` na conexão — se recusar, oriente o usuário a ajustar no setup. Confirme `connectionId` (obtido de `active_queries` ou `blocking_locks`) e o impacto antes.
+3. **Aja só com autorização explícita.** Para encerrar uma sessão problemática use `mysql_kill_session(connectionId, mode)`: `query` (cancela só a instrução) ou `connection` (derruba a sessão inteira, ROLLBACK). Exige `readOnly: false` na conexão — se recusar, oriente o usuário a ajustar no setup. Confirme `connectionId` (obtido de `active_queries` ou `blocking_locks`) e o impacto antes.
 
 ## Como responder
 1. Fundamente cada diagnóstico no JSON real das tools (cite connectionId, table, query time).

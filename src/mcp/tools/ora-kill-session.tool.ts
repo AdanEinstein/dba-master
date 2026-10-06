@@ -2,10 +2,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ProviderManager } from "../../infrastructure/provider-manager.js";
 import type { Config } from "../../config.js";
-import { jsonResult, errorResult, connectionArg } from "../shared.js";
+import { jsonResult, errorResult, connectionArg, assertWritable } from "../shared.js";
 
 // Ação destrutiva de firefighting: cancela o SQL ou derruba a sessão (sid,serial#).
-// Mesma guarda read-only de run_sql — só roda com READ_ONLY=false na conexão.
+// Mesma guarda read-only de run_sql — só roda com readOnly:false na conexão.
 // ponytail: exige privilégio ALTER SYSTEM no usuário do banco.
 export function register(server: McpServer, provider: ProviderManager, cfg: Config): void {
   server.registerTool(
@@ -14,7 +14,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
       title: "Encerrar sessão Oracle",
       description:
         "DESTRUTIVO. Cancela o SQL ou derruba a sessão (ROLLBACK) por sid+serial#. " +
-        "Só Oracle; exige READ_ONLY=false e ALTER SYSTEM.",
+        "Só Oracle; exige readOnly:false na conexão e ALTER SYSTEM.",
       inputSchema: z.object({
         connectionName: connectionArg,
         sid: z.number().int().describe("sid da sessão (coluna sid de ora_monitor)."),
@@ -32,9 +32,7 @@ export function register(server: McpServer, provider: ProviderManager, cfg: Conf
         if (db.engine !== "oracle") {
           throw new Error(`ora_kill_session só suporta Oracle; a conexão usa engine '${db.engine}'.`);
         }
-        if (cfg.connections[name]?.readOnly !== false) {
-          throw new Error("READ_ONLY ativo: ora_kill_session exige READ_ONLY=false na conexão.");
-        }
+        assertWritable(cfg, name, "ora_kill_session");
         // sid/serial são int validados por zod; mode vem de enum → SQL fixo, sem injeção.
         const sql =
           mode === "cancel"

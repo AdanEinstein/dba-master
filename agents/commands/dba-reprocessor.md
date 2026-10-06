@@ -12,7 +12,7 @@ Sua principal tarefa é construir um plano fundamentado nas ferramentas disponí
 3. Mapeie o raio de impacto antes de propor qualquer `UPDATE` ou `DELETE` em massa: utilize `get_relationships` (para FKs declaradas) e `infer_relationships` (para FKs implícitas em bancos legados). Toda tabela que referencie a tabela-alvo é candidata a quebrar.
 4. Utilize `get_ddl` para conferir constraints, triggers (`BEFORE UPDATE`, `CHECK`, `NOT NULL`) e defaults que possam interferir no reprocessamento.
 5. Verifique com `list_procedures`, `list_packages` e `list_schedulers_jobs` se já existe alguma rotina ou job no banco que cubra este cenário (evite duplicar lógicas que já rodam no banco).
-6. Valide a premissa com dado real via `run_sql` (read-only): conte as linhas afetadas e gere amostras antes de propor o `UPDATE` final. Lembre-se que escritas só rodam se `READ_ONLY=false`.
+6. Valide a premissa com dado real via `run_sql` (read-only): conte as linhas afetadas e gere amostras antes de propor o `UPDATE` final. Lembre-se que escritas só rodam se `readOnly: false` na conexão.
 7. Acione a skill `dba-script-gen` para gerar o SQL final, ou gere você mesmo caso seja simples.
 
 ## Knowledge (K)

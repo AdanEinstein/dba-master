@@ -72,11 +72,13 @@ ambos incrementais: a tool MCP `generate_interfaces` e o subcomando CLI `npx -y 
 
 ## Semântica do `readOnly`
 
-Configurado por conexão no `connections.json` (default `true`), bloqueia **apenas** escrita
-(INSERT/UPDATE/DELETE/MERGE/DDL) no `run_sql`. Toda leitura —
+Configurado **por conexão** no `connections.json` (default `true`; só o booleano `false` libera),
+bloqueia **apenas** escrita (INSERT/UPDATE/DELETE/MERGE/DDL) no `run_sql` e os `*_kill_session`
+daquela conexão — liberar uma não afeta as outras. O `configure` pergunta por conexão e
+`list_connections` expõe as liberadas em `writable`. Toda leitura —
 SELECT, extração de DDL, leitura de procedures/packages/schedulers/metadados — é sempre
-permitida, por ser introspecção, não mutação. A guarda (`isWriteStatement`, em `domain/`) é
-DB-agnóstica e composta na tool `run_sql`, fora do adapter.
+permitida, por ser introspecção, não mutação. A detecção (`isWriteStatement`, em `domain/`) é
+DB-agnóstica; a guarda (`assertWritable`, em `mcp/shared.ts`) é composta nas tools, fora do adapter.
 
 ## Por que do zero (e não fork)
 

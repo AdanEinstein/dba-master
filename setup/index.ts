@@ -20,6 +20,17 @@ const CONNECT_EXAMPLE: Record<string, string> = {
 };
 const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
 
+// Escrita por conexão: default read-only; liberar é opt-in explícito, conexão a conexão.
+async function askWritable(existing?: { readOnly?: boolean }): Promise<{ readOnly: boolean }> {
+  const writable = await confirm({
+    message: "Permitir escrita nesta conexão? (INSERT/UPDATE/DELETE/DDL no run_sql e kill session)",
+    initialValue: existing?.readOnly === false
+  });
+  if (isCancel(writable)) { cancel("Cancelado"); process.exit(0); }
+  if (writable) log.warn("Conexão com escrita liberada (readOnly: false). As demais seguem read-only.");
+  return { readOnly: !writable };
+}
+
 // Oracle thick mode: pergunta modo (thin não aceita TNS descriptor completo, LDAP,
 // nem Advanced Security/Wallet) e, se sim, o libDir do Instant Client.
 async function askOracleThick(existing?: { thick?: boolean; clientLibDir?: string }): Promise<{ thick: boolean; clientLibDir?: string }> {
@@ -591,6 +602,7 @@ export async function runConfigure() {
       options: [
         { value: "create", label: "Criar uma nova conexão", hint: "nova credencial" },
         { value: "edit", label: "Editar uma conexão existente", hint: "alterar credencial" },
+        { value: "writable", label: "Definir quais conexões aceitam escrita", hint: "readOnly por conexão" },
         { value: "manage", label: "Excluir conexões existentes", hint: "remover credencial" },
         { value: "exit", label: "Sair", hint: "voltar ao terminal" }
       ]
@@ -600,6 +612,27 @@ export async function runConfigure() {
     if (actionSelect === "exit") {
       manageLoop = false;
       break;
+    }
+
+    // Atalho só para readOnly: uma tela, sem repassar credenciais/túnel.
+    if (actionSelect === "writable") {
+      const names = Object.keys(connections);
+      if (names.length === 0) {
+        log.warn("Nenhuma conexão existente encontrada.");
+        continue;
+      }
+      const writable = await multiselect({
+        message: "Marque as conexões que aceitam escrita (desmarcadas = read-only):",
+        options: names.map(k => ({ value: k, label: k, hint: connections[k].engine })),
+        initialValues: names.filter(k => connections[k].readOnly === false),
+        required: false
+      });
+      if (isCancel(writable)) { cancel("Cancelado"); process.exit(0); }
+      for (const k of names) connections[k].readOnly = !(writable as string[]).includes(k);
+      fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
+      const list = (writable as string[]).join(", ") || "nenhuma";
+      log.success(`Escrita liberada em: ${list}. Demais read-only. Reinicie o MCP no seu agente para aplicar.`);
+      continue;
     }
 
     if (actionSelect === "manage") {
@@ -704,13 +737,18 @@ export async function runConfigure() {
           : { thick: false };
 
         const editTunnel = await configureTunnel(toEdit as string, connToEdit.tunnel);
+        const editWritable = await askWritable(connToEdit);
 
+        // poolMax/schemaFilter não têm prompt: preserva o que já estava no JSON.
         connections[toEdit as string] = {
           engine: editEngine,
           user: skipAuthPrompt ? "" : (userVal ?? ""),
           password: skipAuthPrompt ? undefined : passVal,
           connectString: csVal,
           ...editThick,
+          ...editWritable,
+          ...(connToEdit.poolMax !== undefined ? { poolMax: connToEdit.poolMax } : {}),
+          ...(connToEdit.schemaFilter !== undefined ? { schemaFilter: connToEdit.schemaFilter } : {}),
           ...(editTunnel ? { tunnel: editTunnel } : {})
         };
 
@@ -772,6 +810,7 @@ export async function runConfigure() {
         : { thick: false };
 
       const newTunnel = await configureTunnel(connectionName as string);
+      const newWritable = await askWritable();
 
       connections[connectionName as string] = {
         engine: engine,
@@ -779,6 +818,7 @@ export async function runConfigure() {
         password: passVal,
         connectString: csVal,
         ...newThick,
+        ...newWritable,
         ...(newTunnel ? { tunnel: newTunnel } : {})
       };
 
