@@ -176,6 +176,26 @@ export interface RunSqlResult {
   rowCount: number;
 }
 
+/** Erro/aviso de compilação de um objeto (ex.: ALL_ERRORS no Oracle). */
+export interface CompileError {
+  line: number;
+  position: number;
+  text: string;
+  /** ERROR | WARNING */
+  attribute: string;
+}
+
+/** Resultado de compilar uma unidade (spec, body, procedure...). */
+export interface CompileResult {
+  owner: string;
+  objectName: string;
+  objectType: string;
+  /** VALID | INVALID | FAILED (o CREATE/ALTER em si lançou erro, ver `error`). */
+  status: string;
+  errors: CompileError[];
+  error?: string;
+}
+
 // --- Lógica pura ---------------------------------------------------------
 
 /** Converte um tipo nativo do banco para o tipo TypeScript. Cada provider fornece o seu. */

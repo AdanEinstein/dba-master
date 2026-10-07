@@ -137,7 +137,7 @@ Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master
 | `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
 | `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
-| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql` e os `*_kill_session` **desta conexão**; só `false` (booleano) libera. Leitura sempre liberada |
+| `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`, `compile_object` e os `*_kill_session` **desta conexão**; só `false` (booleano) libera. Leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; vazio (`[]`, default) = todos os schemas de usuário. Oracle: nomes em MAIÚSCULO (exclui os mantidos pela Oracle); Postgres: nomes como `public` (exclui `pg_*` e `information_schema`) |
 | `tunnel` | não | Túnel/proxy quando o banco só é acessível via bastion. Ver abaixo |
 
@@ -247,6 +247,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_packages` | Packages e seus subprogramas com assinaturas | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
 | `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
+| `compile_object` | **Só Oracle, DDL.** Recompila package/procedure/etc. (`name`) ou faz deploy de fonte `CREATE OR REPLACE` (`source`, unidades separadas por `/`); devolve status e erros de compilação; exige `readOnly: false` na conexão | `name?` ou `source?`, `schema?`, `objectType?` |
 | `pg_monitor` | **Só Postgres, leitura.** Monitoramento: sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `readOnly: false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle, leitura.** Monitoramento: sessões, locks, top SQL, tablespace, cache, índices, redo, Data Guard — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |

@@ -3,9 +3,10 @@ import type { Capabilities, DatabaseProvider } from "../../domain/database-provi
 import type {
   TableRef, TableSchema, ViewRef, ViewSchema, Relationships, DdlResult,
   ProcedureRef, PackageRef, ScheduledJob, RunSqlResult,
-  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo, CheckConstraint, SchemaInventory,
+  ColumnInfo, ForeignKey, IndexInfo, ArgumentInfo, CheckConstraint, SchemaInventory, CompileResult,
 } from "../../domain/types.js";
 import { OracleConnection } from "./oracle-connection.js";
+import { parsePlsqlSource, alterCompileSql } from "./plsql-source.js";
 import { OracleQueries, type ColumnRow, type FkRow, type IndexRow, type CheckRow } from "./oracle-queries.js";
 
 // Adapter Oracle: implementa o port DatabaseProvider usando node-oracledb.
@@ -187,11 +188,65 @@ export class OracleProvider implements DatabaseProvider {
     return { rows, rowCount: rows.length };
   }
 
+  async compileObject(opts: { name?: string; schema?: string; objectType?: string; source?: string }): Promise<CompileResult[]> {
+    if (opts.source) {
+      // Deploy: cada unidade num CREATE próprio. Uma falha dura não aborta as demais —
+      // as anteriores já foram aplicadas e o agente precisa saber disso.
+      const out: CompileResult[] = [];
+      let user: string | undefined;
+      for (const u of parsePlsqlSource(opts.source)) {
+        // Sem owner no CREATE, o objeto cai no schema do usuário conectado (schema é ignorado).
+        const owner = u.owner ?? (user ??= await this.q.currentUser());
+        try {
+          await this.q.execDdl(u.sql);
+          out.push(...(await this.compileStatus(owner, u.name, [u.type])));
+        } catch (e) {
+          out.push({ owner, objectName: u.name, objectType: u.type, status: "FAILED", errors: [], error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      return out;
+    }
+
+    if (!opts.name) throw new Error("Informe name (recompilar) ou source (deploy).");
+    const name = opts.name.toUpperCase();
+    let owner = opts.schema?.toUpperCase();
+    let type = opts.objectType?.toUpperCase().replace(/\s+/g, " ");
+    if (!owner || !type) {
+      const rows = await this.q.findObjectForDdl(name, owner);
+      if (rows.length === 0) throw new Error(`Objeto não encontrado: ${name}`);
+      owner = owner ?? rows[0].OWNER;
+      type = type ?? rows[0].OBJECT_TYPE; // findObjectForDdl prioriza PACKAGE
+    }
+    await this.q.execDdl(alterCompileSql(type, owner, name));
+    // ALTER PACKAGE/TYPE ... COMPILE recompila spec e body juntos.
+    const types = type === "PACKAGE" || type === "TYPE" ? [type, `${type} BODY`] : [type];
+    return this.compileStatus(owner, name, types);
+  }
+
   close(): Promise<void> {
     return this.conn.close();
   }
 
   // --- privados ----------------------------------------------------------
+
+  /** Status (ALL_OBJECTS) + erros (ALL_ERRORS) de cada tipo pedido que existir. */
+  private async compileStatus(owner: string, name: string, types: string[]): Promise<CompileResult[]> {
+    const [status, errors] = await Promise.all([
+      this.q.findCompileStatus(owner, name),
+      this.q.findCompileErrors(owner, name),
+    ]);
+    return status
+      .filter((s) => types.includes(s.OBJECT_TYPE))
+      .map((s) => ({
+        owner,
+        objectName: name,
+        objectType: s.OBJECT_TYPE,
+        status: s.STATUS,
+        errors: errors
+          .filter((e) => e.TYPE === s.OBJECT_TYPE)
+          .map((e) => ({ line: e.LINE, position: e.POSITION, text: e.TEXT.trim(), attribute: e.ATTRIBUTE })),
+      }));
+  }
 
   private async resolveOwner(table: string, schema?: string): Promise<string> {
     if (schema) return schema.toUpperCase();

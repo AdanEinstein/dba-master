@@ -10,6 +10,7 @@ import type {
   ScheduledJob,
   RunSqlResult,
   SchemaInventory,
+  CompileResult,
 } from "./types.js";
 
 // PORT (hexagonal): contrato que todo banco deve implementar. Tools e domínio
@@ -57,6 +58,13 @@ export interface DatabaseProvider {
   listScheduledJobs(schema?: string, pattern?: string): Promise<ScheduledJob[]>;
   /** Executa SQL cru, sem guarda de escrita (a política read-only fica na tool). */
   runSql(sql: string, maxRows?: number): Promise<RunSqlResult>;
+
+  /**
+   * Compila: recompila um objeto existente (`name`) ou faz deploy de fonte (`source`,
+   * unidades separadas por `/`). Devolve status + erros por unidade. Opcional por engine
+   * (ausente = banco sem compilação, ex.: Postgres/MySQL). Guarda de escrita fica na tool.
+   */
+  compileObject?(opts: { name?: string; schema?: string; objectType?: string; source?: string }): Promise<CompileResult[]>;
 
   close(): Promise<void>;
 }

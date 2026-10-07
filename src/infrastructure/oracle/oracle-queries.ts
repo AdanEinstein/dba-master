@@ -353,6 +353,33 @@ export class OracleQueries {
     );
   }
 
+  /** DDL sem binds (CREATE/ALTER). Erro de compilação não lança: vem como warning — leia findCompileErrors. */
+  async execDdl(sql: string): Promise<void> {
+    await this.conn.query(sql);
+  }
+
+  async currentUser(): Promise<string> {
+    const rows = await this.conn.query<{ U: string }>(`SELECT USER AS u FROM dual`);
+    return rows[0].U;
+  }
+
+  findCompileStatus(owner: string, name: string): Promise<{ OBJECT_TYPE: string; STATUS: string }[]> {
+    return this.conn.query<{ OBJECT_TYPE: string; STATUS: string }>(
+      `SELECT object_type, status FROM all_objects WHERE owner = :owner AND object_name = :name`,
+      { owner, name },
+    );
+  }
+
+  findCompileErrors(owner: string, name: string): Promise<{ TYPE: string; LINE: number; POSITION: number; TEXT: string; ATTRIBUTE: string }[]> {
+    return this.conn.query<{ TYPE: string; LINE: number; POSITION: number; TEXT: string; ATTRIBUTE: string }>(
+      `SELECT type, line, position, text, attribute
+         FROM all_errors
+        WHERE owner = :owner AND name = :name
+        ORDER BY type, sequence`,
+      { owner, name },
+    );
+  }
+
   runSql(sql: string, maxRows: number): Promise<Record<string, unknown>[]> {
     return this.conn.query<Record<string, unknown>>(sql, {}, { maxRows });
   }

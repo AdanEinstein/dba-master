@@ -38,6 +38,7 @@ linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?`, `limit?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?`, `limit?` |
 | `run_sql` | Executa SQL; com `readOnly` (da conexão) só permite `SELECT`/`WITH`. Corte em `maxRows` vem marcado com `truncated` | `sql`, `maxRows?` |
+| `compile_object` | **Só Oracle, DDL.** Recompila objeto existente (`ALTER ... COMPILE [BODY]`) ou faz deploy de fonte `CREATE OR REPLACE` (spec/body separados por linha `/`). Devolve `ok` + status `VALID`/`INVALID` e erros (linha/coluna, de `ALL_ERRORS`) por unidade. Outros engines: `{supported:false}`. Exige `readOnly: false` na conexão | `name?` ou `source?`, `schema?`, `objectType?` |
 | `pg_monitor` | **Só Postgres.** Monitoramento (leitura): sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação. Escolha a métrica em `check` (ver abaixo) | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela (`cancel`) ou derruba (`terminate`) uma sessão pelo `pid`. Exige `readOnly: false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle.** Monitoramento (leitura): sessões, locks, top SQL, tablespace/segments, cache, índices, redo, Data Guard. Escolha a métrica em `check` (ver abaixo). Exige `SELECT_CATALOG_ROLE` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
