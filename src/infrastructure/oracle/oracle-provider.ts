@@ -190,21 +190,31 @@ export class OracleProvider implements DatabaseProvider {
 
   async compileObject(opts: { name?: string; schema?: string; objectType?: string; source?: string }): Promise<CompileResult[]> {
     if (opts.source) {
-      // Deploy: cada unidade num CREATE próprio. Uma falha dura não aborta as demais —
-      // as anteriores já foram aplicadas e o agente precisa saber disso.
-      const out: CompileResult[] = [];
-      let user: string | undefined;
-      for (const u of parsePlsqlSource(opts.source)) {
-        // Sem owner no CREATE, o objeto cai no schema do usuário conectado (schema é ignorado).
-        const owner = u.owner ?? (user ??= await this.q.currentUser());
-        try {
-          await this.q.execDdl(u.sql);
-          out.push(...(await this.compileStatus(owner, u.name, [u.type])));
-        } catch (e) {
-          out.push({ owner, objectName: u.name, objectType: u.type, status: "FAILED", errors: [], error: e instanceof Error ? e.message : String(e) });
+      // Deploy: script inteiro numa sessão. Nenhuma unidade aborta as demais — as anteriores
+      // já foram aplicadas e o agente precisa saber o que entrou e o que falhou.
+      return this.conn.session(async (exec) => {
+        const out: CompileResult[] = [];
+        for (const u of parsePlsqlSource(opts.source!)) {
+          const base = { owner: u.owner ?? "", objectName: u.name, objectType: u.type, errors: [] };
+          if (u.kind === "skipped") {
+            out.push({ ...base, status: "SKIPPED" });
+            continue;
+          }
+          try {
+            await exec(u.sql);
+            if (u.kind === "sql") {
+              out.push({ ...base, status: "EXECUTED" });
+              continue;
+            }
+            // Sem owner no CREATE, o objeto cai no CURRENT_SCHEMA da sessão (respeita ALTER SESSION).
+            base.owner ||= (await exec<{ S: string }>(`SELECT SYS_CONTEXT('USERENV','CURRENT_SCHEMA') AS s FROM dual`))[0].S;
+            out.push(...(await this.compileStatus(base.owner, u.name, [u.type])));
+          } catch (e) {
+            out.push({ ...base, status: "FAILED", error: e instanceof Error ? e.message : String(e) });
+          }
         }
-      }
-      return out;
+        return out;
+      });
     }
 
     if (!opts.name) throw new Error("Informe name (recompilar) ou source (deploy).");

@@ -29,9 +29,38 @@ test("parsePlsqlSource tira ; final só de VIEW", () => {
   assert.ok(f.sql.endsWith("END;"));
 });
 
-test("parsePlsqlSource rejeita unidade sem CREATE", () => {
-  assert.throws(() => parsePlsqlSource("BEGIN NULL; END;"), /cabeçalho CREATE/);
-  assert.throws(() => parsePlsqlSource("  \n/\n"), /vazio/);
+test("parsePlsqlSource aceita script SQL*Plus misto sem lançar", () => {
+  const src = [
+    "SET DEFINE OFF",
+    "PROMPT criando pkg",
+    "ALTER SESSION SET CURRENT_SCHEMA = APP;",
+    "GRANT SELECT ON t TO r; -- leitura",
+    "CREATE OR REPLACE",
+    "PACKAGE pkg AS",
+    "  c CONSTANT VARCHAR2(10) := 'ação;';",
+    "END;",
+    "/",
+    "SHOW ERRORS",
+    "BEGIN",
+    "  NULL;",
+    "END;",
+    "/",
+    "EXEC dbms_output.put_line('x');",
+    "create view v as",
+    "  select 1 x from dual;",
+    "EXIT",
+  ].join("\r\n");
+  const units = parsePlsqlSource(src);
+  assert.deepEqual(
+    units.map(({ kind, type }) => `${kind}:${type}`),
+    ["skipped:SQLPLUS", "skipped:SQLPLUS", "sql:SQL", "sql:SQL", "plsql:PACKAGE", "skipped:SQLPLUS", "sql:SQL", "sql:SQL", "plsql:VIEW", "skipped:SQLPLUS"],
+  );
+  assert.equal(units[2].sql, "ALTER SESSION SET CURRENT_SCHEMA = APP");
+  assert.ok(units[4].sql.includes("'ação;'") && units[4].sql.endsWith("END;"));
+  assert.equal(units[6].sql, "BEGIN\n  NULL;\nEND;");
+  assert.equal(units[7].sql, "BEGIN dbms_output.put_line('x'); END;");
+  assert.ok(!units[8].sql.endsWith(";"));
+  assert.deepEqual(parsePlsqlSource("  \n/\n"), []);
 });
 
 test("alterCompileSql por tipo", () => {

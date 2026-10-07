@@ -190,7 +190,7 @@ export interface CompileResult {
   owner: string;
   objectName: string;
   objectType: string;
-  /** VALID | INVALID | FAILED (o CREATE/ALTER em si lançou erro, ver `error`). */
+  /** VALID | INVALID | FAILED (o statement lançou erro, ver `error`) | EXECUTED (SQL sem status) | SKIPPED (comando SQL*Plus). */
   status: string;
   errors: CompileError[];
   error?: string;

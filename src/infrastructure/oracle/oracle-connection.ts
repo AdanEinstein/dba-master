@@ -51,6 +51,19 @@ export class OracleConnection {
     }
   }
 
+  /**
+   * Várias execuções numa sessão só: ALTER SESSION (CURRENT_SCHEMA etc.) vale p/ as seguintes.
+   * autoCommit: DML de script de deploy persiste (query() devolve a conexão ao pool sem commit).
+   */
+  async session<T>(fn: (exec: <R>(sql: string) => Promise<R[]>) => Promise<T>): Promise<T> {
+    const conn = await (await this.getPool()).getConnection();
+    try {
+      return await fn(async <R>(sql: string) => (await conn.execute<R>(sql, [], { autoCommit: true })).rows ?? []);
+    } finally {
+      await conn.close();
+    }
+  }
+
   async close(): Promise<void> {
     if (this.pool) {
       await this.pool.close(5);

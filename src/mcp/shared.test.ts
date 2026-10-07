@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tabular, assertWritable } from "./shared.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { tabular, assertWritable, readSourceFile } from "./shared.js";
 import type { Config } from "../config.js";
 
 test("tabular: lista vazia", () => {
@@ -50,4 +53,23 @@ test("assertWritable: só readOnly === false libera escrita", () => {
   for (const n of ["ro", "dflt", "str", "inexistente"]) {
     assert.throws(() => assertWritable(cfg, n, "x"), new RegExp(`Conexão "${n}" é read-only`));
   }
+});
+
+test("readSourceFile detecta encoding e preserva acento", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dba-src-"));
+  const cases: [string, Buffer][] = [
+    ["utf-8", Buffer.from("ação", "utf8")],
+    ["utf-8", Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from("ação", "utf8")])],
+    ["windows-1252", Buffer.from("ação", "latin1")],
+    ["utf-16le", Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("ação", "utf16le")])],
+  ];
+  for (const [i, [enc, bytes]] of cases.entries()) {
+    const f = join(dir, `f${i}.sql`);
+    writeFileSync(f, bytes);
+    const r = await readSourceFile(f);
+    assert.equal(r.text, "ação", enc);
+    assert.equal(r.encoding, enc);
+  }
+  assert.equal((await readSourceFile(join(dir, "f2.sql"), "latin1")).text, "ação");
+  await assert.rejects(readSourceFile(join(dir, "nao-existe.sql")));
 });

@@ -247,7 +247,7 @@ O `dba-master` suporta **múltiplas conexões**. Utilize a tool `list_connection
 | `list_packages` | Packages e seus subprogramas com assinaturas | `schema?`, `pattern?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima exec) | `schema?`, `pattern?` |
 | `run_sql` | Executa SQL (sujeito ao `readOnly` da conexão) | `sql`, `maxRows?` |
-| `compile_object` | **Só Oracle, DDL.** Recompila package/procedure/etc. (`name`) ou faz deploy de fonte `CREATE OR REPLACE` (`source`, unidades separadas por `/`); devolve status e erros de compilação; exige `readOnly: false` na conexão | `name?` ou `source?`, `schema?`, `objectType?` |
+| `compile_object` | **Só Oracle, DDL.** Recompila package/procedure/etc. (`name`) ou executa script de deploy SQL*Plus (`sourceFile` = caminho, qualquer tamanho e encoding; ou `source` inline); devolve status e erros por unidade; exige `readOnly: false` na conexão | `name?`, `source?` ou `sourceFile?`, `encoding?`, `schema?`, `objectType?` |
 | `pg_monitor` | **Só Postgres, leitura.** Monitoramento: sessões, locks, vacuum, bloat, índices, cache hit, WAL/checkpoints, replicação — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |
 | `pg_kill_session` | **Só Postgres, destrutivo.** Cancela/derruba uma sessão pelo `pid`; exige `readOnly: false` na conexão | `pid`, `mode?` |
 | `ora_monitor` | **Só Oracle, leitura.** Monitoramento: sessões, locks, top SQL, tablespace, cache, índices, redo, Data Guard — via `check` | `check`, `limit?`, `orderBy?`, `idleMinutes?` |

@@ -358,11 +358,6 @@ export class OracleQueries {
     await this.conn.query(sql);
   }
 
-  async currentUser(): Promise<string> {
-    const rows = await this.conn.query<{ U: string }>(`SELECT USER AS u FROM dual`);
-    return rows[0].U;
-  }
-
   findCompileStatus(owner: string, name: string): Promise<{ OBJECT_TYPE: string; STATUS: string }[]> {
     return this.conn.query<{ OBJECT_TYPE: string; STATUS: string }>(
       `SELECT object_type, status FROM all_objects WHERE owner = :owner AND object_name = :name`,
