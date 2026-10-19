@@ -80,6 +80,20 @@ function interpolateTunnel(t: TunnelConfig, connName: string): void {
   }
 }
 
+// Interpola ${VAR} nos campos sensíveis e aplica defaults (muta e devolve c).
+// Exportada p/ o configure testar uma conexão recém-salva.
+export function resolveConnection(name: string, c: ConnectionConfig): ConnectionConfig {
+  if (c.user) c.user = interpolateEnv(c.user, name, "user");
+  if (c.password) c.password = interpolateEnv(c.password, name, "password");
+  if (c.connectString) c.connectString = interpolateEnv(c.connectString, name, "connectString");
+  if (c.clientLibDir) c.clientLibDir = interpolateEnv(c.clientLibDir, name, "clientLibDir");
+  if (c.tunnel) interpolateTunnel(c.tunnel, name);
+  c.poolMax ??= DEFAULT_POOL_MAX;
+  c.readOnly ??= true;
+  c.schemaFilter ??= [];
+  return c;
+}
+
 // Fonte única: connections.json (projeto ./.dba-master ou global ~/.dba-master).
 // Segredos ficam em env vars referenciadas via ${VAR} (ver interpolateEnv). Se não
 // houver conexão, NÃO lança — o server sobe com zero conexões (senão o processo
@@ -107,17 +121,7 @@ export function loadConfig(): Config {
     }
   }
 
-  // Interpola ${VAR} nos campos sensíveis e aplica defaults por conexão.
-  for (const [name, c] of Object.entries(connections)) {
-    if (c.user) c.user = interpolateEnv(c.user, name, "user");
-    if (c.password) c.password = interpolateEnv(c.password, name, "password");
-    if (c.connectString) c.connectString = interpolateEnv(c.connectString, name, "connectString");
-    if (c.clientLibDir) c.clientLibDir = interpolateEnv(c.clientLibDir, name, "clientLibDir");
-    if (c.tunnel) interpolateTunnel(c.tunnel, name);
-    c.poolMax ??= DEFAULT_POOL_MAX;
-    c.readOnly ??= true;
-    c.schemaFilter ??= [];
-  }
+  for (const [name, c] of Object.entries(connections)) resolveConnection(name, c);
 
   return {
     connections,

@@ -38,3 +38,10 @@ test("install/configure/uninstall rápidos, escopo projeto", { skip: process.pla
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("maskSecret esconde a senha embutida na URL", async () => {
+  const { maskSecret } = await import("./index.js");
+  assert.equal(maskSecret("postgresql://u:s3nh@@h:5432/db"), "postgresql://u:***@h:5432/db");
+  assert.equal(maskSecret("localhost:1521/ORCL"), "localhost:1521/ORCL");
+  assert.equal(maskSecret("${DBA_X_CS}"), "${DBA_X_CS}");
+});

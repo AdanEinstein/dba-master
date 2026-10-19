@@ -1,16 +1,27 @@
-import { intro, outro, note, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
+import { updateSettings, intro, outro, note, multiselect, spinner, isCancel, cancel, log, text, select, password as promptPassword, confirm } from "@clack/prompts";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 
 import { installMcp, uninstallMcp } from "./install-mcp.js";
 import { installAgents, uninstallAgents } from "./install-agents.js";
 import { showBanner } from "./banner.js";
+import { resolveConnection } from "../src/config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Textos do clack em português (o rodapé "↑/↓ to navigate" é fixo na lib).
+updateSettings({ messages: { cancel: "Cancelado", error: "Algo deu errado" } });
+const YN = { active: "Sim", inactive: "Não" };
+
+// Ctrl+C/Esc em qualquer prompt encerra limpo.
+function must<T>(v: T | symbol): T {
+  if (isCancel(v)) { cancel("Cancelado."); process.exit(0); }
+  return v as T;
+}
 
 // Exemplo de connectString por engine, mostrado no prompt do configure.
 const CONNECT_EXAMPLE: Record<string, string> = {
@@ -21,33 +32,43 @@ const CONNECT_EXAMPLE: Record<string, string> = {
 };
 const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
 
+const ENGINE_OPTIONS = [
+  { value: "oracle", label: "Oracle Database", hint: "usuário + senha + host:porta/serviço" },
+  { value: "postgres", label: "PostgreSQL", hint: "tudo numa URL" },
+  { value: "mysql", label: "MySQL / MariaDB", hint: "tudo numa URL" },
+  { value: "sqlserver", label: "SQL Server (em breve)", disabled: true },
+];
+
+// Esconde a senha embutida em URLs (postgresql://u:SENHA@h) ao exibir na tela.
+export const maskSecret = (s: string) => s.replace(/(\/\/[^:/@\s]+):[^\s/]*@/, "$1:***@");
+
+// Resumo de uma linha da conexão para listas/hints (senha mascarada).
+const describeConn = (c: any) =>
+  `${c.engine} · ${maskSecret(c.user ? `${c.user}@${c.connectString}` : c.connectString)}${c.readOnly === false ? " · escrita" : ""}`;
+
 // Escrita por conexão: default read-only; liberar é opt-in explícito, conexão a conexão.
 async function askWritable(existing?: { readOnly?: boolean }): Promise<{ readOnly: boolean }> {
-  const writable = await confirm({
-    message: "Permitir escrita nesta conexão? (INSERT/UPDATE/DELETE/DDL no run_sql e kill session)",
+  const writable = must(await confirm({ ...YN,
+    message: "Permitir escrita nesta conexão? (INSERT/UPDATE/DELETE/DDL e kill session — padrão: só leitura)",
     initialValue: existing?.readOnly === false
-  });
-  if (isCancel(writable)) { cancel("Cancelado"); process.exit(0); }
-  if (writable) log.warn("Conexão com escrita liberada (readOnly: false). As demais seguem read-only.");
+  }));
+  if (writable) log.warn("Escrita liberada nesta conexão (readOnly: false). As demais seguem read-only.");
   return { readOnly: !writable };
 }
 
-// Oracle thick mode: pergunta modo (thin não aceita TNS descriptor completo, LDAP,
-// nem Advanced Security/Wallet) e, se sim, o libDir do Instant Client.
+// Oracle thick mode: thin não aceita TNS descriptor completo, LDAP nem Advanced
+// Security/Wallet. Se sim, pergunta o libDir do Instant Client.
 async function askOracleThick(existing?: { thick?: boolean; clientLibDir?: string }): Promise<{ thick: boolean; clientLibDir?: string }> {
-  const thick = await confirm({
-    message: "Usar thick mode? (necessário para strings de conexão que o thin não aceita: TNS descriptor completo, LDAP, Advanced Security/Wallet)",
+  const thick = must(await confirm({ ...YN,
+    message: "Usar thick mode (Oracle Instant Client)? Só é preciso para TNS descriptor completo, LDAP ou Wallet",
     initialValue: existing?.thick ?? false
-  });
-  if (isCancel(thick)) { cancel("Cancelado"); process.exit(0); }
+  }));
   if (!thick) return { thick: false };
 
-  const clientLibDir = await text({
-    message: "Caminho do Instant Client (branco = detecta via ORACLE_HOME/PATH):",
+  const clientLibDir = must(await text({
+    message: "Pasta do Instant Client (enter = detectar via ORACLE_HOME/PATH):",
     defaultValue: existing?.clientLibDir ?? ""
-  }) as string;
-  if (isCancel(clientLibDir)) { cancel("Cancelado"); process.exit(0); }
-
+  }));
   return { thick: true, ...(clientLibDir ? { clientLibDir } : {}) };
 }
 
@@ -145,40 +166,38 @@ function removeEnvVars(connName: string, conn: any): { target: string } {
   return { target: rc };
 }
 
-// Núcleo reutilizável: recebe candidatos (campos plaintext a virar ${VAR}), pergunta
-// se guarda como referência e se persiste, e aplica a ref via cand.set. Usado tanto
-// pelas credenciais do banco quanto pelos segredos do túnel.
-async function offerEnvRefs(
-  name: string,
-  cand: Array<{ field: string; val: string; set: (ref: string) => void }>
-): Promise<void> {
+type EnvCand = { field: string; val: string; set: (ref: string) => void };
+
+// Recebe os segredos ainda em texto puro e pergunta UMA vez onde guardá-los. Se em
+// env var, troca o valor por ${VAR} via cand.set e exporta em process.env (o teste de
+// conexão logo após salvar resolve as refs nesta mesma sessão).
+async function offerEnvRefs(name: string, cand: EnvCand[]): Promise<void> {
   if (cand.length === 0) return;
 
-  const useEnvRefs = await confirm({
-    message: "Guardar credenciais como referência a env var? (recomendado — mantém o segredo fora do connections.json, que agentes de IA conseguem ler)",
-    initialValue: true
-  });
-  if (isCancel(useEnvRefs)) { cancel("Cancelado"); process.exit(0); }
-  if (!useEnvRefs) return;
+  const isWin = process.platform === "win32";
+  const how = must(await select({
+    message: "Onde guardar usuário, senha e demais segredos desta conexão?",
+    options: [
+      { value: "auto", label: "Em env vars, gravadas automaticamente (recomendado)", hint: isWin ? "via setx" : `em ${shellRcPath()}` },
+      { value: "manual", label: "Em env vars, eu mesmo adiciono", hint: "mostro os comandos para colar" },
+      { value: "plain", label: "Direto no connections.json", hint: "agentes de IA conseguem ler esse arquivo" },
+    ]
+  }));
+  if (how === "plain") return;
 
   const pairs: Array<[string, string]> = cand.map(c => {
     const v = envVarName(name, c.field);
     c.set(`\${${v}}`);
+    process.env[v] = c.val;
     return [v, c.val];
   });
 
-  const autoPersist = await confirm({
-    message: "Escrever essas env vars automaticamente no seu ambiente? (senão, mostro os comandos para colar)",
-    initialValue: false
-  });
-  if (isCancel(autoPersist)) { cancel("Cancelado"); process.exit(0); }
-
-  const isWin = process.platform === "win32";
-  if (autoPersist) {
+  if (how === "auto") {
     const { target } = upsertEnvVars(name, pairs);
     const activate = isWin ? "Abra um novo terminal para valerem." : `Rode: source ${target}  (ou reabra o terminal).`;
     note(
       [`${pairs.length} env var(s) gravadas em: ${target}`, "", activate,
+       "Reinicie o agente de IA a partir de um terminal que já tenha essas variáveis.",
        "Aviso: o segredo fica em texto plano nesse destino — para proteção forte, use um keychain."].join("\n"),
       "Env vars persistidas"
     );
@@ -186,7 +205,7 @@ async function offerEnvRefs(
     const cmds = pairs.map(([v, val]) => (isWin ? `setx ${v} "${val}"` : `export ${v}='${sqEscape(val)}'`));
     const hint = isWin
       ? "Rode no PowerShell/cmd (setx persiste p/ novos terminais) e reabra o terminal."
-      : "Cole no seu ~/.zshrc ou ~/.bashrc e reinicie o shell.";
+      : `Cole no seu ${shellRcPath()} e reinicie o shell.`;
     note(
       [...cmds, "", hint, "O connections.json guardará apenas as referências ${...}."].join("\n"),
       "Adicione estas env vars ao seu ambiente"
@@ -194,38 +213,18 @@ async function offerEnvRefs(
   }
 }
 
-// Credenciais do banco: monta candidatos USER/PASS/CS (só plaintext novo) e delega
-// ao núcleo. Refs ${...} existentes ficam intactas. Devolve os valores a gravar.
-async function applyEnvRefs(
-  name: string,
-  engine: string,
-  vals: { user?: string; password?: string; connectString: string }
-): Promise<{ userVal?: string; passVal?: string; csVal: string }> {
-  let userVal = vals.user;
-  let passVal = vals.password;
-  let csVal = vals.connectString;
-
-  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
-  if (engine !== "postgres" && userVal && !isRef(userVal)) cand.push({ field: "USER", val: userVal, set: r => (userVal = r) });
-  if (engine !== "postgres" && passVal && !isRef(passVal)) cand.push({ field: "PASS", val: passVal, set: r => (passVal = r) });
-  if (csVal && !isRef(csVal)) cand.push({ field: "CS", val: csVal, set: r => (csVal = r) });
-
-  await offerEnvRefs(name, cand);
-  return { userVal, passVal, csVal };
-}
-
-// Fluxo interativo do túnel/proxy de uma conexão (create/edit). Nem toda conexão
-// precisa — pergunta primeiro. Segredos (chave PEM, senha, passphrase, URL de proxy)
-// passam pela mesma indireção ${VAR}. Devolve o bloco tunnel ou undefined (sem túnel).
-async function configureTunnel(name: string, existing?: any): Promise<any | undefined> {
-  const wants = await confirm({
-    message: "Este banco só é acessível via túnel/proxy (bastion SSH, SOCKS/HTTP, comando externo)?",
+// Fluxo do túnel/proxy (create/edit). Nem toda conexão precisa — pergunta primeiro.
+// Devolve o bloco tunnel (ou undefined) e os segredos candidatos a env var, que o
+// wizard junta às credenciais do banco para perguntar uma vez só.
+async function configureTunnel(existing?: any): Promise<{ tunnel?: any; cand: EnvCand[] }> {
+  const cand: EnvCand[] = [];
+  const wants = must(await confirm({ ...YN,
+    message: "O banco só é acessível via túnel/proxy (bastion SSH, SOCKS/HTTP, comando externo)?",
     initialValue: !!existing
-  });
-  if (isCancel(wants)) { cancel("Cancelado"); process.exit(0); }
-  if (!wants) return undefined;
+  }));
+  if (!wants) return { cand };
 
-  const type = await select({
+  const type = must(await select({
     message: "Tipo de túnel:",
     options: [
       { value: "ssh", label: "Túnel SSH (bastion)", hint: "port-forward via host SSH" },
@@ -234,16 +233,10 @@ async function configureTunnel(name: string, existing?: any): Promise<any | unde
       { value: "command", label: "Comando externo", hint: "cloud-sql-proxy, aws ssm..." },
     ],
     initialValue: existing?.type ?? "ssh"
-  }) as string;
-  if (isCancel(type)) { cancel("Cancelado"); process.exit(0); }
+  }));
 
-  // Candidatos a env-ref (segredos do túnel) — preenchidos conforme o tipo.
-  const cand: Array<{ field: string; val: string; set: (ref: string) => void }> = [];
-  const ask = async (msg: string, def = "") => {
-    const v = await text({ message: msg, defaultValue: def }) as string;
-    if (isCancel(v)) { cancel("Cancelado"); process.exit(0); }
-    return v;
-  };
+  const ask = async (msg: string, def = "") => must(await text({ message: msg, defaultValue: def, placeholder: def || undefined }));
+  const askPass = async (msg: string) => must(await promptPassword({ message: msg }));
 
   let tunnel: any;
 
@@ -253,7 +246,7 @@ async function configureTunnel(name: string, existing?: any): Promise<any | unde
     const user = await ask("Usuário SSH:", existing?.user ?? "");
     tunnel = { type: "ssh", host, port: Number(portStr) || 22, user };
 
-    const auth = await select({
+    const auth = must(await select({
       message: "Autenticação SSH:",
       options: [
         { value: "keyfile", label: "Chave privada (arquivo)", hint: "caminho do .pem/id_rsa" },
@@ -261,38 +254,31 @@ async function configureTunnel(name: string, existing?: any): Promise<any | unde
         { value: "password", label: "Senha SSH" },
         { value: "agent", label: "ssh-agent", hint: "usa SSH_AUTH_SOCK" },
       ]
-    }) as string;
-    if (isCancel(auth)) { cancel("Cancelado"); process.exit(0); }
+    }));
 
-    if (auth === "keyfile") {
-      tunnel.privateKey = await ask("Caminho do arquivo da chave privada:", isRef(existing?.privateKey) ? "" : (existing?.privateKey ?? ""));
-      const pp = await promptPassword({ message: "Passphrase da chave (branco = sem):" }) as string;
-      if (isCancel(pp)) { cancel("Cancelado"); process.exit(0); }
-      if (pp) { tunnel.passphrase = pp; cand.push({ field: "TUNNEL_PASSPHRASE", val: pp, set: r => (tunnel.passphrase = r) }); }
-    } else if (auth === "keycontent") {
-      const pem = await ask("Cole o conteúdo PEM da chave privada:");
-      tunnel.privateKey = pem;
-      cand.push({ field: "TUNNEL_KEY", val: pem, set: r => (tunnel.privateKey = r) });
-      const pp = await promptPassword({ message: "Passphrase da chave (branco = sem):" }) as string;
-      if (isCancel(pp)) { cancel("Cancelado"); process.exit(0); }
+    if (auth === "keyfile" || auth === "keycontent") {
+      if (auth === "keyfile") {
+        tunnel.privateKey = await ask("Caminho do arquivo da chave privada:", isRef(existing?.privateKey) ? "" : (existing?.privateKey ?? ""));
+      } else {
+        tunnel.privateKey = await ask("Cole o conteúdo PEM da chave privada:");
+        cand.push({ field: "TUNNEL_KEY", val: tunnel.privateKey, set: r => (tunnel.privateKey = r) });
+      }
+      const pp = await askPass("Passphrase da chave (enter = sem passphrase):");
       if (pp) { tunnel.passphrase = pp; cand.push({ field: "TUNNEL_PASSPHRASE", val: pp, set: r => (tunnel.passphrase = r) }); }
     } else if (auth === "password") {
-      const pw = await promptPassword({ message: "Senha SSH:" }) as string;
-      if (isCancel(pw)) { cancel("Cancelado"); process.exit(0); }
-      tunnel.password = pw;
-      cand.push({ field: "TUNNEL_PASS", val: pw, set: r => (tunnel.password = r) });
+      tunnel.password = await askPass("Senha SSH:");
+      cand.push({ field: "TUNNEL_PASS", val: tunnel.password, set: r => (tunnel.password = r) });
     } else {
       tunnel.agent = true;
     }
 
-    const hk = await select({
+    const hk = must(await select({
       message: "Verificação de host key do bastion:",
       options: [
         { value: "known", label: "known_hosts (recomendado)", hint: "~/.ssh/known_hosts" },
         { value: "pin", label: "Pin de fingerprint", hint: "SHA256:..." },
       ]
-    }) as string;
-    if (isCancel(hk)) { cancel("Cancelado"); process.exit(0); }
+    }));
     if (hk === "pin") tunnel.hostKey = await ask("Fingerprint SHA256 esperado do host:", existing?.hostKey ?? "");
   } else if (type === "socks" || type === "http") {
     const url = await ask(
@@ -300,7 +286,7 @@ async function configureTunnel(name: string, existing?: any): Promise<any | unde
       isRef(existing?.url) ? "" : (existing?.url ?? "")
     );
     tunnel = { type, url };
-    // URL pode conter credenciais → oferecer env-ref.
+    // URL pode conter credenciais → candidata a env-ref.
     if (!isRef(url)) cand.push({ field: "TUNNEL_PROXY_URL", val: url, set: r => (tunnel.url = r) });
   } else {
     const command = await ask("Comando do túnel (binário):", existing?.command ?? "");
@@ -316,8 +302,83 @@ async function configureTunnel(name: string, existing?: any): Promise<any | unde
     };
   }
 
+  return { tunnel, cand };
+}
+
+// Wizard único de create/edit. Na edição, enter mantém o valor atual (mostrado
+// mascarado no placeholder). Segredos em texto puro → uma pergunta só no final.
+async function connectionWizard(name: string, prev?: any): Promise<any> {
+  const engine = must(await select({
+    message: "Qual banco de dados?",
+    options: ENGINE_OPTIONS,
+    initialValue: prev?.engine ?? "oracle"
+  }));
+  const isOracle = engine === "oracle";
+  // Trocou de engine na edição: valores antigos não servem de default.
+  const cur = (k: string): string | undefined => (prev?.engine === engine ? prev?.[k] : undefined) || undefined;
+  const ask = async (message: string, current?: string) => must(await text({
+    message,
+    ...(current ? { placeholder: `${maskSecret(current)}  (enter mantém)`, defaultValue: current } : {}),
+    validate: v => (!v?.trim() && !current ? "Campo obrigatório." : undefined)
+  }));
+
+  let user: string | undefined;
+  let password: string | undefined;
+  if (isOracle) {
+    user = await ask("Usuário do banco:", cur("user"));
+    const pw = must(await promptPassword({ message: cur("password") ? "Senha (enter mantém a atual):" : "Senha:" }));
+    password = pw || cur("password");
+  } else {
+    log.info(`${engine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vão dentro da própria URL.`);
+  }
+  let connectString = await ask(`${isOracle ? "String de conexão" : "URL de conexão"} (ex: ${connectExample(engine)}):`, cur("connectString"));
+
+  const thick = isOracle ? await askOracleThick(prev?.engine === engine ? prev : undefined) : { thick: false };
+  const { tunnel, cand } = await configureTunnel(prev?.tunnel);
+  const writable = await askWritable(prev);
+
+  // Refs ${...} já existentes ficam como estão; só texto puro vira candidato.
+  if (user && !isRef(user)) cand.push({ field: "USER", val: user, set: r => (user = r) });
+  if (password && !isRef(password)) cand.push({ field: "PASS", val: password, set: r => (password = r) });
+  if (!isRef(connectString)) cand.push({ field: "CS", val: connectString, set: r => (connectString = r) });
   await offerEnvRefs(name, cand);
-  return tunnel;
+
+  // poolMax/schemaFilter não têm prompt: preserva o que já estava no JSON.
+  return {
+    engine,
+    user: user ?? "",
+    password,
+    connectString,
+    ...thick,
+    ...writable,
+    ...(prev?.poolMax !== undefined ? { poolMax: prev.poolMax } : {}),
+    ...(prev?.schemaFilter !== undefined ? { schemaFilter: prev.schemaFilter } : {}),
+    ...(tunnel ? { tunnel } : {})
+  };
+}
+
+// Abre a conexão e roda SELECT 1, com teto de 20s. Falha não desfaz o save: só avisa.
+async function testConnection(name: string, conn: any): Promise<void> {
+  const s = spinner();
+  s.start(`Testando a conexão '${name}'...`);
+  let timer: NodeJS.Timeout | undefined;
+  let pm: { closeAll(): Promise<void> } | undefined;
+  try {
+    const { ProviderManager } = await import("../src/infrastructure/provider-manager.js");
+    const resolved = resolveConnection(name, structuredClone(conn));
+    const mgr = new ProviderManager({ connections: { [name]: resolved }, cacheDir: tmpdir() });
+    pm = mgr;
+    const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error("sem resposta em 20s")), 20_000); });
+    await Promise.race([mgr.getProvider(name).runSql(resolved.engine === "oracle" ? "SELECT 1 FROM DUAL" : "SELECT 1", 1), timeout]);
+    s.stop(`Conexão '${name}' OK.`);
+  } catch (e) {
+    s.error(`Não conectou em '${name}': ${e instanceof Error ? e.message : String(e)}`);
+    log.info("A configuração foi salva assim mesmo — corrija em 'Editar conexão' e teste de novo.");
+  } finally {
+    clearTimeout(timer);
+    // ponytail: não espera o close — pool travado (host inalcançável) não pode prender a TUI.
+    pm?.closeAll().catch(() => {});
+  }
 }
 
 // Opções compartilhadas pelos fluxos da TUI — com hint para dar contexto.
@@ -329,10 +390,16 @@ const AGENT_OPTIONS = [
   { value: "cursor", label: "Cursor", hint: "Cursor IDE" },
 ];
 const SCOPE_OPTIONS = [
-  { value: "project", label: "Projeto — pasta atual", hint: "./.dba-master" },
-  { value: "global", label: "Global — diretório home", hint: "~/.dba-master" },
+  { value: "project", label: "Projeto — só nesta pasta", hint: "./.dba-master" },
+  { value: "global", label: "Global — vale para todas as pastas", hint: "~/.dba-master" },
 ];
 const AGENT_VALUES = AGENT_OPTIONS.map(o => o.value);
+
+// Pasta de config de cada agente no home: se existe, o agente está instalado na máquina.
+const AGENT_HOME: Record<string, string> = {
+  claude: ".claude", copilot: ".copilot", opencode: ".config/opencode", antigravity: ".gemini", cursor: ".cursor",
+};
+const detectedAgents = () => AGENT_VALUES.filter(a => fs.existsSync(resolve(homedir(), AGENT_HOME[a])));
 
 // Modo rápido: "--agents claude,cursor" ou "--agents all" → lista validada.
 function parseAgents(v?: string): string[] {
@@ -344,8 +411,32 @@ function parseAgents(v?: string): string[] {
   return list;
 }
 
+// Multiselect de agentes com os detectados na máquina já marcados.
+async function askAgents(message: string): Promise<string[]> {
+  const found = detectedAgents();
+  return must(await multiselect({
+    message,
+    options: AGENT_OPTIONS.map(o => (found.includes(o.value) ? { ...o, hint: `${o.hint} · detectado` } : o)),
+    initialValues: found,
+    required: true
+  }));
+}
+
 const scopeDir = (isGlobal: boolean) =>
   isGlobal ? resolve(homedir(), ".dba-master") : resolve(process.cwd(), ".dba-master");
+
+// Escopo sugerido: onde já há instalação; senão global se rodando do home, senão projeto.
+// Devolve true = global.
+async function askScope(message: string): Promise<boolean> {
+  const has = (g: boolean) => fs.existsSync(scopeDir(g));
+  const initialValue = has(false) ? "project" : (has(true) || process.cwd() === homedir()) ? "global" : "project";
+  const scope = must(await select({
+    message,
+    initialValue,
+    options: SCOPE_OPTIONS.map(o => (has(o.value === "global") ? { ...o, hint: `${o.hint} · já existe` } : o))
+  }));
+  return scope === "global";
+}
 
 // Cria o diretório de dados do escopo e, no escopo projeto, garante .dba-master no .gitignore.
 function ensureScopeDir(isGlobal: boolean): string {
@@ -363,6 +454,13 @@ function ensureScopeDir(isGlobal: boolean): string {
   return dir;
 }
 
+// connections.json do escopo; inexistente → {}. JSON inválido → avisa e começa vazio.
+function readConnections(jsonPath: string): Record<string, any> {
+  if (!fs.existsSync(jsonPath)) return {};
+  try { return JSON.parse(fs.readFileSync(jsonPath, "utf8")); }
+  catch { log.warn(`${jsonPath} não é um JSON válido — será recriado ao salvar.`); return {}; }
+}
+
 // Sem args → TUI. Com args → modo rápido (sem prompts): --agents <lista|all> [-g].
 export async function runInstaller(args: string[] = []) {
   const fast = args.length > 0;
@@ -371,27 +469,11 @@ export async function runInstaller(args: string[] = []) {
   if (!fast) {
     console.clear();
     await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
-    intro("Bem-vindo ao instalador do DBA-Master!");
+    intro("Instalador do DBA-Master");
   }
 
-  const agents = fast ? parseAgents(values.agents) : await multiselect({
-    message: "Quais agentes de IA você deseja configurar para o dba-master?",
-    options: AGENT_OPTIONS,
-    required: true
-  });
-
-  if (isCancel(agents)) {
-    cancel("Instalação cancelada.");
-    process.exit(0);
-  }
-
-  const scope = fast ? (values.global ? "global" : "project") : await select({
-    message: "Onde deseja instalar as configurações e dados (escopo)?",
-    options: SCOPE_OPTIONS
-  });
-  if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
-
-  const isGlobal = scope === "global";
+  const agents = fast ? parseAgents(values.agents) : await askAgents("Em quais agentes de IA instalar o dba-master?");
+  const isGlobal = fast ? !!values.global : await askScope("Onde guardar as configurações e conexões?");
   const dbaMasterDir = scopeDir(isGlobal);
 
   const versionFile = resolve(dbaMasterDir, ".version");
@@ -401,28 +483,25 @@ export async function runInstaller(args: string[] = []) {
   if (!fast && fs.existsSync(versionFile)) {
     const installedVersion = fs.readFileSync(versionFile, "utf8").trim();
     if (compareVersions(installedVersion, currentVersion) < 0) {
-      const update = await confirm({
-        message: `dba-master v${installedVersion} já está instalado neste escopo. Versão atual é v${currentVersion}. Deseja atualizar?`,
+      const update = must(await confirm({ ...YN,
+        message: `dba-master v${installedVersion} já está instalado neste escopo. Atualizar para v${currentVersion}?`,
         initialValue: true
-      });
-      if (isCancel(update)) { cancel("Cancelado"); process.exit(0); }
+      }));
       if (!update) { cancel("Instalação cancelada."); process.exit(0); }
     }
   }
 
   ensureScopeDir(isGlobal);
 
-  const s = spinner();
-  s.start("Configurando agentes selecionados...");
-
+  // ponytail: sem spinner — a instalação é síncrona e instantânea, e o spinner
+  // embaralhava as linhas "✓ agente → arquivo" que installMcp imprime.
   const failedAgents: { agent: string, error: unknown }[] = [];
-
-  for (const agent of (agents as string[])) {
+  for (const agent of agents) {
     try {
-      const args = [`--agent`, agent];
-      if (isGlobal) args.push("-g");
-      installMcp(args);
-      installAgents(args);
+      const a = [`--agent`, agent];
+      if (isGlobal) a.push("-g");
+      installMcp(a);
+      installAgents(a);
     } catch (e) {
       failedAgents.push({ agent, error: e });
     }
@@ -430,23 +509,31 @@ export async function runInstaller(args: string[] = []) {
 
   fs.writeFileSync(versionFile, currentVersion);
 
-  if (failedAgents.length === 0) {
-    s.stop("Agentes configurados com sucesso!");
-  } else {
-    s.stop("Configuração finalizada, mas houve problemas.");
-    for (const { agent, error } of failedAgents) {
-      log.warn(`Falha ao instalar o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
-    }
+  for (const { agent, error } of failedAgents) {
+    log.warn(`Falha ao instalar no agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (failedAgents.length < agents.length) log.success("Agentes configurados.");
+
+  // Emenda direto no configure: o usuário não precisa saber do segundo comando.
+  const jsonPath = resolve(dbaMasterDir, "connections.json");
+  if (!fast) {
+    const hasConns = Object.keys(readConnections(jsonPath)).length > 0;
+    const now = must(await confirm({ ...YN,
+      message: hasConns ? "Revisar as conexões de banco agora?" : "Configurar a conexão com o banco agora?",
+      initialValue: !hasConns
+    }));
+    if (now) await manageConnections(isGlobal);
   }
 
+  const missingConns = Object.keys(readConnections(jsonPath)).length === 0;
   note(
     [
       `Dados e credenciais em:`,
       `  ${dbaMasterDir}`,
       ``,
       `Próximos passos:`,
-      `  1) Configure as conexões:  npx -y dba-master@latest configure`,
-      `  2) Reinicie os agentes que você configurou`,
+      ...(missingConns ? [`  • Configure uma conexão:  npx -y dba-master@latest configure`] : []),
+      `  • Reinicie ${agents.length > 1 ? "os agentes configurados" : "o agente configurado"} para carregar o dba-master`,
     ].join("\n"),
     "Instalação concluída",
   );
@@ -467,77 +554,49 @@ export async function runUninstaller(args: string[] = []) {
     intro("Desinstalador do DBA-Master");
   }
 
-  const agents = fast ? parseAgents(values.agents) : await multiselect({
-    message: "De quais agentes de IA você deseja remover o dba-master?",
-    options: AGENT_OPTIONS,
-    required: true
-  });
+  const agents = fast ? parseAgents(values.agents) : await askAgents("De quais agentes de IA remover o dba-master?");
+  const isGlobal = fast ? !!values.global : await askScope("De qual escopo remover?");
+  const dbaMasterDir = scopeDir(isGlobal);
+  const scopeJson = resolve(dbaMasterDir, "connections.json");
+  const conns = readConnections(scopeJson);
+  const nConns = Object.keys(conns).length;
 
-  if (isCancel(agents)) {
-    cancel("Desinstalação cancelada.");
-    process.exit(0);
-  }
-
-  const scope = fast ? (values.global ? "global" : "project") : await select({
-    message: "De qual escopo deseja remover as configurações e dados?",
-    options: SCOPE_OPTIONS
-  });
-  if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
-
-  const isGlobal = scope === "global";
-
-  const confirmDelete = fast ? !!values.purge : await confirm({
-    message: `Deseja também apagar o diretório de dados .dba-master (${isGlobal ? "global" : "projeto"})?`,
-    initialValue: true
-  });
-  if (isCancel(confirmDelete)) { cancel("Cancelado"); process.exit(0); }
-
-  const s = spinner();
-  s.start("Removendo configurações dos agentes selecionados...");
+  // Purge é irreversível (apaga credenciais): uma pergunta só, com o alvo explícito e padrão "não".
+  const purge = fast ? !!values.purge : fs.existsSync(dbaMasterDir) && must(await confirm({ ...YN,
+    message: `Apagar também os dados em ${dbaMasterDir}${nConns ? ` (${nConns} conexão(ões) e as env vars gravadas para elas)` : ""}? Não dá para desfazer.`,
+    initialValue: false
+  }));
 
   const failedAgents: { agent: string, error: unknown }[] = [];
-
-  for (const agent of (agents as string[])) {
+  for (const agent of agents) {
     try {
-      const args = [`--agent`, agent];
-      if (isGlobal) args.push("-g");
-      uninstallMcp(args);
-      uninstallAgents(args);
+      const a = [`--agent`, agent];
+      if (isGlobal) a.push("-g");
+      uninstallMcp(a);
+      uninstallAgents(a);
     } catch (e) {
       failedAgents.push({ agent, error: e });
     }
   }
-
-  // Remover env vars persistidas das conexões — antes de apagar o connections.json.
-  const scopeJson = resolve(scopeDir(isGlobal), "connections.json");
-  if (fs.existsSync(scopeJson)) {
-    try {
-      const conns = JSON.parse(fs.readFileSync(scopeJson, "utf8")) as Record<string, { engine?: string }>;
-      const names = Object.keys(conns);
-      if (names.length > 0) {
-        const dropEnv = fast ? !!values.purge : await confirm({
-          message: `Remover também as env vars persistidas de ${names.length} conexão(ões) do seu ambiente?`,
-          initialValue: true
-        });
-        if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
-        if (dropEnv) {
-          let target = "";
-          for (const [name, c] of Object.entries(conns)) target = removeEnvVars(name, c).target;
-          const activate = process.platform === "win32" ? "Abra um novo terminal para refletir." : `Rode: source ${target}  (ou reabra o terminal).`;
-          note([`Env vars removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
-        }
-      }
-    } catch (e) {
-      log.warn(`Falha ao remover env vars: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  for (const { agent, error } of failedAgents) {
+    log.warn(`Falha ao remover do agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  if (confirmDelete) {
-    const dbaMasterDir = scopeDir(isGlobal);
-    if (fs.existsSync(dbaMasterDir)) {
-      fs.rmSync(dbaMasterDir, { recursive: true, force: true });
+  if (purge) {
+    // Env vars antes de apagar o connections.json (é dele que sai a lista).
+    if (nConns > 0) {
+      try {
+        let target = "";
+        for (const [name, c] of Object.entries(conns)) target = removeEnvVars(name, c).target;
+        const activate = process.platform === "win32" ? "Abra um novo terminal para refletir." : `Rode: source ${target}  (ou reabra o terminal).`;
+        note([`Env vars removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
+      } catch (e) {
+        log.warn(`Falha ao remover env vars: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
-    
+
+    fs.rmSync(dbaMasterDir, { recursive: true, force: true });
+
     // Remover do .gitignore se project scoped
     if (!isGlobal) {
       const gitignorePath = resolve(process.cwd(), ".gitignore");
@@ -549,19 +608,10 @@ export async function runUninstaller(args: string[] = []) {
     }
   }
 
-  if (failedAgents.length === 0) {
-    s.stop("Agentes limpos com sucesso!");
-  } else {
-    s.stop("Desinstalação finalizada, mas houve problemas.");
-    for (const { agent, error } of failedAgents) {
-      log.warn(`Falha ao remover o agente '${agent}': ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
   note(
-    confirmDelete
+    purge
       ? "Configurações dos agentes e diretório de dados removidos."
-      : "Configurações dos agentes removidas (o diretório de dados foi mantido).",
+      : `Configurações dos agentes removidas. Dados mantidos em ${dbaMasterDir}.`,
     "Desinstalação concluída",
   );
   outro("Até a próxima! 👋");
@@ -633,266 +683,116 @@ export async function runConfigure(args: string[] = []) {
   }
 
   console.clear();
-
   await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
+  intro("Conexões de banco do DBA-Master");
 
-  intro("Gerenciador de credenciais do DBA-Master");
+  await manageConnections(await askScope("Qual escopo de configuração?"));
+  outro("Pronto. Reinicie o MCP no seu agente para aplicar as mudanças.");
+}
 
-  const scope = await select({
-    message: "Onde deseja gerenciar as configurações (escopo)?",
-    options: SCOPE_OPTIONS
-  });
-  if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
+// Menu de conexões de um escopo. Usado pelo configure e emendado no fim do install.
+async function manageConnections(isGlobal: boolean): Promise<void> {
+  const jsonPath = resolve(ensureScopeDir(isGlobal), "connections.json");
+  const connections = readConnections(jsonPath);
+  const save = () => fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
+  const pick = async (message: string) => must(await select({
+    message,
+    options: [
+      ...Object.keys(connections).map(k => ({ value: k, label: k, hint: describeConn(connections[k]) })),
+      { value: "", label: "← Voltar" }
+    ]
+  }));
 
-  const dbaMasterDir = ensureScopeDir(scope === "global");
+  // Cria (sem editing) ou edita; salva e testa na sequência.
+  const upsert = async (editing?: string) => {
+    const first = Object.keys(connections).length === 0;
+    const name = editing ?? must(await text({
+      message: "Nome da conexão (é como o agente vai se referir a ela):",
+      placeholder: "ex: prod, homolog",
+      ...(first ? { initialValue: "default" } : {}),
+      validate: v => {
+        const n = v?.trim() ?? "";
+        if (!n) return "Informe um nome.";
+        if (!/^[\w.-]+$/.test(n)) return "Use só letras, números, _ . ou -";
+        if (connections[n]) return `'${n}' já existe — use 'Editar conexão'.`;
+      }
+    })).trim();
+    connections[name] = await connectionWizard(name, editing ? connections[editing] : undefined);
+    save();
+    log.success(`Conexão '${name}' salva em ${jsonPath} (${connections[name].readOnly ? "só leitura" : "escrita liberada"}).`);
+    await testConnection(name, connections[name]);
+  };
 
-  const jsonPath = resolve(dbaMasterDir, "connections.json");
-  let connections: Record<string, any> = {};
-  
-  if (fs.existsSync(jsonPath)) {
-    try {
-      connections = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
-    } catch (e) {
-      log.warn(`Arquivo connections.json existe mas não é um JSON válido. Será recriado.`);
-    }
+  // Escopo sem conexões: vai direto para a criação, sem menu no caminho.
+  if (Object.keys(connections).length === 0) {
+    log.info(`Nenhuma conexão em ${jsonPath} ainda — vamos criar a primeira.`);
+    await upsert();
   }
 
-  note(
-    `Arquivo: ${jsonPath}\n${Object.keys(connections).length} conexão(ões) configurada(s)`,
-    "Gerenciar conexões",
-  );
-
-  let manageLoop = true;
-  while (manageLoop) {
-    const actionSelect = await select({
-      message: "Gerenciar conexões:",
+  while (true) {
+    const names = Object.keys(connections);
+    const action = must(await select({
+      message: `Conexões (${names.length}): o que deseja fazer?`,
       options: [
-        { value: "create", label: "Criar uma nova conexão", hint: "nova credencial" },
-        { value: "edit", label: "Editar uma conexão existente", hint: "alterar credencial" },
-        { value: "writable", label: "Definir quais conexões aceitam escrita", hint: "readOnly por conexão" },
-        { value: "manage", label: "Excluir conexões existentes", hint: "remover credencial" },
-        { value: "exit", label: "Sair", hint: "voltar ao terminal" }
+        { value: "done", label: "Concluir" },
+        { value: "create", label: "Criar outra conexão" },
+        ...(names.length ? [
+          { value: "edit", label: "Editar conexão" },
+          { value: "test", label: "Testar conexão" },
+          { value: "writable", label: "Definir quais conexões aceitam escrita", hint: "padrão: só leitura" },
+          { value: "delete", label: "Excluir conexão" },
+        ] : []),
       ]
-    });
-    if (isCancel(actionSelect)) { cancel("Cancelado"); process.exit(0); }
-    
-    if (actionSelect === "exit") {
-      manageLoop = false;
-      break;
-    }
+    }));
 
-    // Atalho só para readOnly: uma tela, sem repassar credenciais/túnel.
-    if (actionSelect === "writable") {
-      const names = Object.keys(connections);
-      if (names.length === 0) {
-        log.warn("Nenhuma conexão existente encontrada.");
-        continue;
-      }
-      const writable = await multiselect({
-        message: "Marque as conexões que aceitam escrita (desmarcadas = read-only):",
-        options: names.map(k => ({ value: k, label: k, hint: connections[k].engine })),
-        initialValues: names.filter(k => connections[k].readOnly === false),
-        required: false
-      });
-      if (isCancel(writable)) { cancel("Cancelado"); process.exit(0); }
-      for (const k of names) connections[k].readOnly = !(writable as string[]).includes(k);
-      fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
-      const list = (writable as string[]).join(", ") || "nenhuma";
-      log.success(`Escrita liberada em: ${list}. Demais read-only. Reinicie o MCP no seu agente para aplicar.`);
+    if (action === "done") return;
+    if (action === "create") { await upsert(); continue; }
+
+    if (action === "edit") {
+      const k = await pick("Qual conexão editar?");
+      if (k) await upsert(k);
       continue;
     }
 
-    if (actionSelect === "manage") {
-      if (Object.keys(connections).length === 0) {
-        log.warn("Nenhuma conexão existente encontrada.");
-        continue;
-      }
-      const toDelete = await select({
-        message: "Qual conexão deseja excluir?",
-        options: [
-          ...Object.keys(connections).map(k => ({ value: k, label: `${k} (${connections[k].user}@${connections[k].connectString})` })),
-          { value: "back", label: "Voltar" }
-        ]
-      });
-      if (isCancel(toDelete)) { cancel("Cancelado"); process.exit(0); }
-      
-      if (toDelete !== "back") {
-        const delConn = connections[toDelete as string];
-        delete connections[toDelete as string];
-        fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
-        log.success(`Conexão '${toDelete}' excluída.`);
-
-        const dropEnv = await confirm({
-          message: "Remover também as env vars desta conexão do seu ambiente?",
-          initialValue: true
-        });
-        if (isCancel(dropEnv)) { cancel("Cancelado"); process.exit(0); }
-        if (dropEnv) {
-          const { target } = removeEnvVars(toDelete as string, delConn);
-          const activate = process.platform === "win32"
-            ? "Abra um novo terminal para refletir."
-            : `Rode: source ${target}  (ou reabra o terminal).`;
-          note([`Env vars da conexão '${toDelete}' removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
-        }
-      }
+    if (action === "test") {
+      const k = await pick("Qual conexão testar?");
+      if (k) await testConnection(k, connections[k]);
+      continue;
     }
 
-    if (actionSelect === "edit") {
-      if (Object.keys(connections).length === 0) {
-        log.warn("Nenhuma conexão existente encontrada.");
-        continue;
-      }
-      const toEdit = await select({
-        message: "Qual conexão deseja editar?",
-        options: [
-          ...Object.keys(connections).map(k => ({ value: k, label: `${k} (${connections[k].user}@${connections[k].connectString})` })),
-          { value: "back", label: "Voltar" }
-        ]
-      });
-      if (isCancel(toEdit)) { cancel("Cancelado"); process.exit(0); }
-
-      if (toEdit !== "back") {
-        const connToEdit = connections[toEdit as string];
-        const editEngine = await select({
-          message: "Selecione o motor de banco de dados (engine):",
-          options: [
-            { value: "oracle", label: "Oracle Database" },
-            { value: "postgres", label: "PostgreSQL" },
-            { value: "mysql", label: "MySQL / MariaDB" },
-            { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
-          ],
-          initialValue: connToEdit.engine
-        }) as string;
-        if (isCancel(editEngine)) { cancel("Cancelado"); process.exit(0); }
-
-        // Postgres: credenciais vêm embutidas na URL de conexão — não pedir user/senha.
-        let editDbUser = "";
-        let editDbPassword = "";
-        const skipAuthPrompt = ["postgres", "mysql"].includes(editEngine);
-
-        if (!skipAuthPrompt) {
-          editDbUser = await text({
-            message: "Usuário do banco de dados (deixe em branco para manter o atual):"
-          }) as string;
-          if (isCancel(editDbUser)) { cancel("Cancelado"); process.exit(0); }
-
-          editDbPassword = await promptPassword({
-            message: "Senha do banco de dados (deixe em branco para manter a atual):"
-          }) as string;
-          if (isCancel(editDbPassword)) { cancel("Cancelado"); process.exit(0); }
-        } else {
-          log.info(`${editEngine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vêm da própria URL de conexão.`);
-        }
-
-        const editConnectString = await text({
-          message: `String de conexão (ex: ${connectExample(editEngine)}):`,
-          defaultValue: connToEdit.connectString
-        }) as string;
-        if (isCancel(editConnectString)) { cancel("Cancelado"); process.exit(0); }
-
-        // Branco = mantém o valor atual (inclusive se já for uma ref ${...}).
-        // ponytail: troca de engine pode deixar env var órfã (ex: USER/PASS ao virar
-        // postgres); export não-usado é inofensivo, ignoramos.
-        const { userVal, passVal, csVal } = await applyEnvRefs(toEdit as string, editEngine, {
-          user: skipAuthPrompt ? "" : (editDbUser || connToEdit.user),
-          password: skipAuthPrompt ? undefined : (editDbPassword || connToEdit.password),
-          connectString: editConnectString || connToEdit.connectString
-        });
-
-        const editThick = editEngine === "oracle"
-          ? await askOracleThick(connToEdit)
-          : { thick: false };
-
-        const editTunnel = await configureTunnel(toEdit as string, connToEdit.tunnel);
-        const editWritable = await askWritable(connToEdit);
-
-        // poolMax/schemaFilter não têm prompt: preserva o que já estava no JSON.
-        connections[toEdit as string] = {
-          engine: editEngine,
-          user: skipAuthPrompt ? "" : (userVal ?? ""),
-          password: skipAuthPrompt ? undefined : passVal,
-          connectString: csVal,
-          ...editThick,
-          ...editWritable,
-          ...(connToEdit.poolMax !== undefined ? { poolMax: connToEdit.poolMax } : {}),
-          ...(connToEdit.schemaFilter !== undefined ? { schemaFilter: connToEdit.schemaFilter } : {}),
-          ...(editTunnel ? { tunnel: editTunnel } : {})
-        };
-
-        fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
-        log.success(`Conexão '${toEdit}' atualizada.`);
-      }
+    // Atalho só para readOnly: uma tela, sem repassar credenciais/túnel.
+    if (action === "writable") {
+      const writable = must(await multiselect({
+        message: "Marque as conexões que aceitam escrita (desmarcadas = só leitura):",
+        options: names.map(k => ({ value: k, label: k, hint: connections[k].engine })),
+        initialValues: names.filter(k => connections[k].readOnly === false),
+        required: false
+      }));
+      for (const k of names) connections[k].readOnly = !writable.includes(k);
+      save();
+      log.success(`Escrita liberada em: ${writable.join(", ") || "nenhuma"}. Demais só leitura.`);
+      continue;
     }
 
-    if (actionSelect === "create") {
-      const connectionName = await text({
-        message: "Dê um nome para esta nova conexão (ex: prod_db, homolog, default):",
-        placeholder: "default",
-        defaultValue: "default"
-      });
-      if (isCancel(connectionName)) { cancel("Cancelado"); process.exit(0); }
-
-      const engine = await select({
-        message: "Selecione o motor de banco de dados (engine):",
-        options: [
-          { value: "oracle", label: "Oracle Database", hint: "thin / thick" },
-          { value: "postgres", label: "PostgreSQL", hint: "via URL" },
-          { value: "mysql", label: "MySQL / MariaDB", hint: "via URL" },
-          { value: "sqlserver", label: "SQL Server (Em breve)", disabled: true }
-        ]
-      }) as string;
-      if (isCancel(engine)) { cancel("Cancelado"); process.exit(0); }
-
-      // Postgres e MySQL: credenciais vêm embutidas na URL de conexão
-      let dbUser = "";
-      let dbPassword: string | undefined;
-      const skipNewAuthPrompt = ["postgres", "mysql"].includes(engine);
-      if (!skipNewAuthPrompt) {
-        dbUser = await text({
-          message: "Usuário do banco de dados:"
-        }) as string;
-        if (isCancel(dbUser)) { cancel("Cancelado"); process.exit(0); }
-
-        dbPassword = await promptPassword({
-          message: "Senha do banco de dados:"
-        }) as string;
-        if (isCancel(dbPassword)) { cancel("Cancelado"); process.exit(0); }
-      } else {
-        log.info(`${engine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vêm da própria URL de conexão.`);
+    if (action === "delete") {
+      const k = await pick("Qual conexão excluir?");
+      if (!k) continue;
+      const del = connections[k];
+      const hasEnv = envRefsInConn(del).length > 0;
+      const ok = must(await confirm({ ...YN,
+        message: `Excluir '${k}' (${describeConn(del)})${hasEnv ? " e as env vars dela" : ""}? Não dá para desfazer.`,
+        initialValue: false
+      }));
+      if (!ok) continue;
+      delete connections[k];
+      save();
+      // Env var de conexão excluída é órfã: remove junto (só as linhas marcadas pelo dba-master).
+      if (hasEnv) {
+        const { target } = removeEnvVars(k, del);
+        const activate = process.platform === "win32" ? "Abra um novo terminal para refletir." : `Rode: source ${target}  (ou reabra o terminal).`;
+        note([`Env vars da conexão '${k}' removidas de: ${target}`, "", activate].join("\n"), "Env vars removidas");
       }
-
-      const connectString = await text({
-        message: `String de conexão (ex: ${connectExample(engine)}):`
-      }) as string;
-      if (isCancel(connectString)) { cancel("Cancelado"); process.exit(0); }
-
-      const { userVal, passVal, csVal } = await applyEnvRefs(connectionName as string, engine, {
-        user: dbUser,
-        password: dbPassword || undefined,
-        connectString
-      });
-
-      const newThick = engine === "oracle"
-        ? await askOracleThick()
-        : { thick: false };
-
-      const newTunnel = await configureTunnel(connectionName as string);
-      const newWritable = await askWritable();
-
-      connections[connectionName as string] = {
-        engine: engine,
-        user: userVal ?? "",
-        password: passVal,
-        connectString: csVal,
-        ...newThick,
-        ...newWritable,
-        ...(newTunnel ? { tunnel: newTunnel } : {})
-      };
-
-      fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
-      log.success(`Conexão '${connectionName}' salva em ${jsonPath}`);
+      log.success(`Conexão '${k}' excluída.`);
     }
   }
-
-  outro("Gerenciamento de credenciais concluído.");
 }
