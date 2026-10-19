@@ -1,0 +1,40 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runConfigure, runInstaller, runUninstaller } from "./index.js";
+
+// Modo rápido ponta a ponta num tmpdir; HOME/SHELL apontam pro tmp p/ não tocar no rc real.
+test("install/configure/uninstall rápidos, escopo projeto", { skip: process.platform === "win32" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dba-fast-"));
+  const prev = { cwd: process.cwd(), HOME: process.env.HOME, SHELL: process.env.SHELL };
+  process.chdir(dir);
+  process.env.HOME = dir;
+  process.env.SHELL = "/bin/bash";
+  try {
+    await runInstaller(["--agents", "claude"]);
+    const mcp = JSON.parse(fs.readFileSync(join(dir, ".mcp.json"), "utf8"));
+    assert.ok(mcp.mcpServers["dba-master"]);
+
+    await runConfigure(["--name", "t", "--engine", "postgres", "--connect-string", "postgresql://u:p@h/db", "--env-ref"]);
+    const conns = JSON.parse(fs.readFileSync(join(dir, ".dba-master", "connections.json"), "utf8"));
+    assert.equal(conns.t.engine, "postgres");
+    assert.equal(conns.t.connectString, "${DBA_T_CS}");
+    assert.equal(conns.t.readOnly, true);
+    assert.match(fs.readFileSync(join(dir, ".bashrc"), "utf8"), /^export DBA_T_CS='postgresql:\/\/u:p@h\/db' # dba-master:t$/m);
+
+    await assert.rejects(runConfigure(["--name", "x", "--engine", "foo", "--connect-string", "y"]), /--engine inválido/);
+    await assert.rejects(runInstaller(["--agents", "nope"]), /inválido/);
+
+    await runUninstaller(["--agents", "claude", "--purge"]);
+    assert.equal(fs.existsSync(join(dir, ".dba-master")), false);
+    assert.doesNotMatch(fs.readFileSync(join(dir, ".bashrc"), "utf8"), /DBA_T_CS/);
+  } finally {
+    process.chdir(prev.cwd);
+    process.env.HOME = prev.HOME;
+    process.env.SHELL = prev.SHELL;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { parseArgs } from "node:util";
 
 import { installMcp, uninstallMcp } from "./install-mcp.js";
 import { installAgents, uninstallAgents } from "./install-agents.js";
@@ -331,15 +332,49 @@ const SCOPE_OPTIONS = [
   { value: "project", label: "Projeto — pasta atual", hint: "./.dba-master" },
   { value: "global", label: "Global — diretório home", hint: "~/.dba-master" },
 ];
+const AGENT_VALUES = AGENT_OPTIONS.map(o => o.value);
 
-export async function runInstaller() {
-  console.clear();
+// Modo rápido: "--agents claude,cursor" ou "--agents all" → lista validada.
+function parseAgents(v?: string): string[] {
+  if (!v) throw new Error("--agents é obrigatório no modo rápido (ex: --agents claude,cursor ou --agents all).");
+  if (v === "all") return [...AGENT_VALUES];
+  const list = v.split(",").map(s => s.trim()).filter(Boolean);
+  const bad = list.filter(a => !AGENT_VALUES.includes(a));
+  if (bad.length || list.length === 0) throw new Error(`Agente(s) inválido(s): ${bad.join(", ") || v}. Válidos: ${AGENT_VALUES.join(", ")}, all.`);
+  return list;
+}
 
-  await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
+const scopeDir = (isGlobal: boolean) =>
+  isGlobal ? resolve(homedir(), ".dba-master") : resolve(process.cwd(), ".dba-master");
 
-  intro("Bem-vindo ao instalador do DBA-Master!");
+// Cria o diretório de dados do escopo e, no escopo projeto, garante .dba-master no .gitignore.
+function ensureScopeDir(isGlobal: boolean): string {
+  const dir = scopeDir(isGlobal);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!isGlobal) {
+    const gitignorePath = resolve(process.cwd(), ".gitignore");
+    const ignoreEntry = "\n# DBA-Master\n.dba-master\n";
+    if (fs.existsSync(gitignorePath)) {
+      if (!fs.readFileSync(gitignorePath, "utf8").includes(".dba-master")) fs.appendFileSync(gitignorePath, ignoreEntry);
+    } else {
+      fs.writeFileSync(gitignorePath, ignoreEntry.trim() + "\n");
+    }
+  }
+  return dir;
+}
 
-  const agents = await multiselect({
+// Sem args → TUI. Com args → modo rápido (sem prompts): --agents <lista|all> [-g].
+export async function runInstaller(args: string[] = []) {
+  const fast = args.length > 0;
+  const { values } = parseArgs({ args, options: { agents: { type: "string" }, global: { type: "boolean", short: "g" } } });
+
+  if (!fast) {
+    console.clear();
+    await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
+    intro("Bem-vindo ao instalador do DBA-Master!");
+  }
+
+  const agents = fast ? parseAgents(values.agents) : await multiselect({
     message: "Quais agentes de IA você deseja configurar para o dba-master?",
     options: AGENT_OPTIONS,
     required: true
@@ -350,21 +385,20 @@ export async function runInstaller() {
     process.exit(0);
   }
 
-  const scope = await select({
+  const scope = fast ? (values.global ? "global" : "project") : await select({
     message: "Onde deseja instalar as configurações e dados (escopo)?",
     options: SCOPE_OPTIONS
   });
   if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
 
   const isGlobal = scope === "global";
-  const dbaMasterDir = isGlobal
-    ? resolve(homedir(), ".dba-master")
-    : resolve(process.cwd(), ".dba-master");
+  const dbaMasterDir = scopeDir(isGlobal);
 
   const versionFile = resolve(dbaMasterDir, ".version");
   const currentVersion = getCurrentVersion();
 
-  if (fs.existsSync(versionFile)) {
+  // Modo rápido não pergunta: atualiza direto.
+  if (!fast && fs.existsSync(versionFile)) {
     const installedVersion = fs.readFileSync(versionFile, "utf8").trim();
     if (compareVersions(installedVersion, currentVersion) < 0) {
       const update = await confirm({
@@ -376,22 +410,7 @@ export async function runInstaller() {
     }
   }
 
-  if (!fs.existsSync(dbaMasterDir)) {
-    fs.mkdirSync(dbaMasterDir, { recursive: true });
-  }
-
-  if (!isGlobal) {
-    const gitignorePath = resolve(process.cwd(), ".gitignore");
-    const ignoreEntry = "\n# DBA-Master\n.dba-master\n";
-    if (fs.existsSync(gitignorePath)) {
-      const gitignore = fs.readFileSync(gitignorePath, "utf8");
-      if (!gitignore.includes(".dba-master")) {
-        fs.appendFileSync(gitignorePath, ignoreEntry);
-      }
-    } else {
-      fs.writeFileSync(gitignorePath, ignoreEntry.trim() + "\n");
-    }
-  }
+  ensureScopeDir(isGlobal);
 
   const s = spinner();
   s.start("Configurando agentes selecionados...");
@@ -434,14 +453,21 @@ export async function runInstaller() {
   outro("Tudo pronto — bom proveito! 🚀");
 }
 
-export async function runUninstaller() {
-  console.clear();
+// Sem args → TUI. Com args → modo rápido: --agents <lista|all> [-g] [--purge].
+// --purge também apaga o .dba-master e as env vars persistidas das conexões.
+export async function runUninstaller(args: string[] = []) {
+  const fast = args.length > 0;
+  const { values } = parseArgs({ args, options: {
+    agents: { type: "string" }, global: { type: "boolean", short: "g" }, purge: { type: "boolean" }
+  } });
 
-  await showBanner({ colors: ["#f00", "#f40"], gradient: ["red", "magenta"] });
+  if (!fast) {
+    console.clear();
+    await showBanner({ colors: ["#f00", "#f40"], gradient: ["red", "magenta"] });
+    intro("Desinstalador do DBA-Master");
+  }
 
-  intro("Desinstalador do DBA-Master");
-
-  const agents = await multiselect({
+  const agents = fast ? parseAgents(values.agents) : await multiselect({
     message: "De quais agentes de IA você deseja remover o dba-master?",
     options: AGENT_OPTIONS,
     required: true
@@ -452,7 +478,7 @@ export async function runUninstaller() {
     process.exit(0);
   }
 
-  const scope = await select({
+  const scope = fast ? (values.global ? "global" : "project") : await select({
     message: "De qual escopo deseja remover as configurações e dados?",
     options: SCOPE_OPTIONS
   });
@@ -460,7 +486,7 @@ export async function runUninstaller() {
 
   const isGlobal = scope === "global";
 
-  const confirmDelete = await confirm({
+  const confirmDelete = fast ? !!values.purge : await confirm({
     message: `Deseja também apagar o diretório de dados .dba-master (${isGlobal ? "global" : "projeto"})?`,
     initialValue: true
   });
@@ -483,14 +509,13 @@ export async function runUninstaller() {
   }
 
   // Remover env vars persistidas das conexões — antes de apagar o connections.json.
-  const scopeDir = isGlobal ? resolve(homedir(), ".dba-master") : resolve(process.cwd(), ".dba-master");
-  const scopeJson = resolve(scopeDir, "connections.json");
+  const scopeJson = resolve(scopeDir(isGlobal), "connections.json");
   if (fs.existsSync(scopeJson)) {
     try {
       const conns = JSON.parse(fs.readFileSync(scopeJson, "utf8")) as Record<string, { engine?: string }>;
       const names = Object.keys(conns);
       if (names.length > 0) {
-        const dropEnv = await confirm({
+        const dropEnv = fast ? !!values.purge : await confirm({
           message: `Remover também as env vars persistidas de ${names.length} conexão(ões) do seu ambiente?`,
           initialValue: true
         });
@@ -508,9 +533,7 @@ export async function runUninstaller() {
   }
 
   if (confirmDelete) {
-    const dbaMasterDir = isGlobal
-      ? resolve(homedir(), ".dba-master")
-      : resolve(process.cwd(), ".dba-master");
+    const dbaMasterDir = scopeDir(isGlobal);
     if (fs.existsSync(dbaMasterDir)) {
       fs.rmSync(dbaMasterDir, { recursive: true, force: true });
     }
@@ -544,7 +567,71 @@ export async function runUninstaller() {
   outro("Até a próxima! 👋");
 }
 
-export async function runConfigure() {
+// Modo rápido do configure: upsert de UMA conexão, sem prompts. Túnel só pela TUI
+// (o bloco tunnel existente é preservado). Lança Error em flag inválida.
+function configureFast(v: {
+  name?: string; engine?: string; "connect-string"?: string; user?: string; password?: string;
+  thick?: boolean; "client-lib-dir"?: string; writable?: boolean; "env-ref"?: boolean; global?: boolean;
+}): void {
+  const { name, engine } = v;
+  if (!name || !engine || !v["connect-string"]) throw new Error("Modo rápido do configure exige --name, --engine e --connect-string.");
+  if (!["oracle", "postgres", "mysql"].includes(engine)) throw new Error(`--engine inválido: ${engine}. Válidos: oracle, postgres, mysql.`);
+  const isOracle = engine === "oracle";
+  if (isOracle && !v.user) throw new Error("Oracle exige --user.");
+  if (!isOracle && (v.user || v.password)) throw new Error(`${engine}: usuário e senha vão na própria URL do --connect-string.`);
+  if (!isOracle && (v.thick || v["client-lib-dir"])) throw new Error("--thick/--client-lib-dir só valem para Oracle.");
+
+  const jsonPath = resolve(ensureScopeDir(!!v.global), "connections.json");
+  // JSON inválido aborta (não sobrescreve às cegas como a TUI).
+  const connections: Record<string, any> = fs.existsSync(jsonPath) ? JSON.parse(fs.readFileSync(jsonPath, "utf8")) : {};
+
+  let user = v.user ?? "";
+  let password = v.password;
+  let connectString = v["connect-string"];
+  if (v["env-ref"]) {
+    const pairs: Array<[string, string]> = [];
+    const ref = (field: string, val: string) => { const n = envVarName(name, field); pairs.push([n, val]); return `\${${n}}`; };
+    if (user && !isRef(user)) user = ref("USER", user);
+    if (password && !isRef(password)) password = ref("PASS", password);
+    if (!isRef(connectString)) connectString = ref("CS", connectString);
+    if (pairs.length) {
+      const { target } = upsertEnvVars(name, pairs);
+      console.log(`✓ ${pairs.length} env var(s) gravadas em ${target}`);
+      if (process.platform !== "win32") console.log(`  Rode: source ${target}  (ou reabra o terminal).`);
+    }
+  }
+
+  const thick = !!v.thick || !!v["client-lib-dir"];
+  const prev = connections[name] ?? {};
+  connections[name] = {
+    engine,
+    user,
+    password,
+    connectString,
+    thick: isOracle && thick,
+    ...(isOracle && v["client-lib-dir"] ? { clientLibDir: v["client-lib-dir"] } : {}),
+    readOnly: !v.writable,
+    ...(prev.poolMax !== undefined ? { poolMax: prev.poolMax } : {}),
+    ...(prev.schemaFilter !== undefined ? { schemaFilter: prev.schemaFilter } : {}),
+    ...(prev.tunnel ? { tunnel: prev.tunnel } : {})
+  };
+  fs.writeFileSync(jsonPath, JSON.stringify(connections, null, 2));
+  console.log(`✓ Conexão '${name}' salva em ${jsonPath} (${v.writable ? "escrita liberada" : "read-only"}). Reinicie o MCP no agente para aplicar.`);
+}
+
+// Sem args → TUI. Com args → configureFast (ver flags lá).
+export async function runConfigure(args: string[] = []) {
+  if (args.length > 0) {
+    const { values } = parseArgs({ args, options: {
+      name: { type: "string" }, engine: { type: "string" }, "connect-string": { type: "string" },
+      user: { type: "string" }, password: { type: "string" }, thick: { type: "boolean" },
+      "client-lib-dir": { type: "string" }, writable: { type: "boolean" }, "env-ref": { type: "boolean" },
+      global: { type: "boolean", short: "g" }
+    } });
+    configureFast(values);
+    return;
+  }
+
   console.clear();
 
   await showBanner({ colors: ["#f80", "#f40"], gradient: ["red", "blue"] });
@@ -557,27 +644,7 @@ export async function runConfigure() {
   });
   if (isCancel(scope)) { cancel("Cancelado"); process.exit(0); }
 
-  const isGlobal = scope === "global";
-  const dbaMasterDir = isGlobal
-    ? resolve(homedir(), ".dba-master")
-    : resolve(process.cwd(), ".dba-master");
-
-  if (!fs.existsSync(dbaMasterDir)) {
-    fs.mkdirSync(dbaMasterDir, { recursive: true });
-  }
-
-  if (!isGlobal) {
-    const gitignorePath = resolve(process.cwd(), ".gitignore");
-    const ignoreEntry = "\n# DBA-Master\n.dba-master\n";
-    if (fs.existsSync(gitignorePath)) {
-      const gitignore = fs.readFileSync(gitignorePath, "utf8");
-      if (!gitignore.includes(".dba-master")) {
-        fs.appendFileSync(gitignorePath, ignoreEntry);
-      }
-    } else {
-      fs.writeFileSync(gitignorePath, ignoreEntry.trim() + "\n");
-    }
-  }
+  const dbaMasterDir = ensureScopeDir(scope === "global");
 
   const jsonPath = resolve(dbaMasterDir, "connections.json");
   let connections: Record<string, any> = {};

@@ -19,6 +19,22 @@ npx -y dba-master@latest configure          # cria/edita o connections.json (pro
 claude mcp add dba-master -- npx -y dba-master@latest
 ```
 
+**Modo rápido (uma linha, sem prompts)** — passe flags e os prompts são pulados (útil em script/CI):
+
+```bash
+npx -y dba-master@latest install   --agents claude,cursor -g        # -g = global; sem -g = projeto
+npx -y dba-master@latest configure --name prod --engine postgres \
+    --connect-string 'postgresql://u:p@h:5432/db' --env-ref -g
+npx -y dba-master@latest configure --name ora --engine oracle --user scott --password tiger \
+    --connect-string 'h:1521/ORCL' --thick --client-lib-dir /opt/instantclient --writable
+npx -y dba-master@latest uninstall --agents all -g --purge          # --purge apaga .dba-master + env vars
+```
+
+`configure` com flags cria/atualiza uma conexão (preserva `poolMax`, `schemaFilter` e `tunnel` já existentes;
+túnel só pela TUI). Sem `--writable`, a conexão é read-only. `--env-ref` grava as credenciais como
+`${DBA_<CONN>_*}` no rc do shell em vez de texto plano no `connections.json`. Senha passada em flag fica no
+histórico do shell — prefira a TUI para segredos sensíveis. Lista completa: `npx -y dba-master@latest help`.
+
 ## Setup a partir do repo (dev)
 
 ```bash
