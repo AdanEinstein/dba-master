@@ -29,7 +29,7 @@ Dependendo do escopo escolhido, os arquivos de configuração (ex: `mcpServers`)
 
 | Agente          | Arquivo MCP (Global / Local)             | Arquivo de Skill/Command (Global / Local)      |
 | --------------- | ---------------------------------------- | ---------------------------------------------- |
-| Claude Desktop  | `~/.claude/claude_desktop_config.json`   | N/A                                            |
+| Claude Desktop  | macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json`, Linux `~/.config/Claude/claude_desktop_config.json` (só global) | N/A |
 | Claude Code     | `~/.claude.json` / `./.claude.json`      | `~/.claude/commands/...`                       |
 | Copilot CLI     | `~/.copilot/mcp-config.json` / `./.copilot/mcp-config.json` | `~/.copilot/skills/dba-investigate/SKILL.md` / `./.copilot/...` |
 | Opencode        | `~/.config/opencode/opencode.json` / `./.opencode/opencode.json` | `~/.config/opencode/command/...` / `./.opencode/command/...` |

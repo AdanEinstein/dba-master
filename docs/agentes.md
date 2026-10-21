@@ -12,7 +12,8 @@ Registra o server e a skill (`npx -y dba-master@latest install`) na configuraç�
 npx -y dba-master@latest install
 ```
 
-Destinos por agente: Claude Desktop (`~/.claude/claude_desktop_config.json`) + Claude Code
+Destinos por agente: Claude Desktop (só global; macOS `~/Library/Application Support/Claude/claude_desktop_config.json`,
+Windows `%APPDATA%\Claude\claude_desktop_config.json`, Linux `~/.config/Claude/claude_desktop_config.json`) + Claude Code
 (`~/.claude.json`), Copilot CLI (`~/.copilot/mcp-config.json`), Opencode
 (`~/.config/opencode/opencode.json`), Antigravity (`~/.gemini/config/mcp_config.json`), Cursor
 (`~/.cursor/mcp.json`).

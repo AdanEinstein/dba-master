@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 
-import { installMcp, uninstallMcp } from "./install-mcp.js";
+import { installMcp, uninstallMcp, claudeDesktopConfigPath } from "./install-mcp.js";
 import { installAgents, uninstallAgents } from "./install-agents.js";
 import { showBanner } from "./banner.js";
 import { resolveConnection } from "../src/config.js";
@@ -399,7 +399,9 @@ const AGENT_VALUES = AGENT_OPTIONS.map(o => o.value);
 const AGENT_HOME: Record<string, string> = {
   claude: ".claude", copilot: ".copilot", opencode: ".config/opencode", antigravity: ".gemini", cursor: ".cursor",
 };
-const detectedAgents = () => AGENT_VALUES.filter(a => fs.existsSync(resolve(homedir(), AGENT_HOME[a])));
+const detectedAgents = () => AGENT_VALUES.filter(a =>
+  fs.existsSync(resolve(homedir(), AGENT_HOME[a])) ||
+  (a === "claude" && fs.existsSync(dirname(claudeDesktopConfigPath()))));
 
 // Modo rápido: "--agents claude,cursor" ou "--agents all" → lista validada.
 function parseAgents(v?: string): string[] {

@@ -29,13 +29,35 @@ function updateJson(file: string, mutate: (data: Record<string, unknown>) => voi
 const bag = (data: Record<string, unknown>, key: string) =>
   (data[key] ??= {}) as Record<string, unknown>;
 
+// Config do Claude Desktop (só global, sem escopo de projeto). Linux: build comunitária.
+export function claudeDesktopConfigPath(): string {
+  const file = "claude_desktop_config.json";
+  switch (process.platform) {
+    case "darwin":
+      return join(homedir(), "Library", "Application Support", "Claude", file);
+    case "win32":
+      return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "Claude", file);
+    default:
+      return join(homedir(), ".config", "Claude", file);
+  }
+}
+
+// Desktop só fala stdio e não aceita `type`; no Windows `npx` é um .cmd, precisa de `cmd /c`.
+const desktopEntry = () =>
+  process.platform === "win32"
+    ? { command: "cmd", args: ["/c", COMMAND, ...ARGS] }
+    : { command: COMMAND, args: ARGS };
+
+// Path errado que versões antigas gravavam; só é limpo no uninstall.
+const LEGACY_DESKTOP = () => join(homedir(), ".claude", "claude_desktop_config.json");
+
 const AGENTS: Record<string, (global: boolean) => void> = {
   claude(global) {
     if (global) {
       // Claude Desktop
-      const desktop = join(homedir(), ".claude", "claude_desktop_config.json");
+      const desktop = claudeDesktopConfigPath();
       updateJson(desktop, (d) => {
-        bag(d, "mcpServers")[KEY] = { type: "stdio", command: COMMAND, args: ARGS };
+        bag(d, "mcpServers")[KEY] = desktopEntry();
       });
       console.log(`✓ Claude Desktop  → ${desktop}`);
       // Claude Code (user scope): ~/.claude.json, mcpServers na raiz
@@ -119,9 +141,10 @@ function removeFromJson(file: string, mutate: (data: Record<string, unknown>) =>
 const UNINSTALL_AGENTS: Record<string, (global: boolean) => void> = {
   claude(global) {
     if (global) {
-      const desktop = join(homedir(), ".claude", "claude_desktop_config.json");
-      removeFromJson(desktop, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
-      console.log(`✓ Removido do Claude Desktop  → ${desktop}`);
+      for (const desktop of [claudeDesktopConfigPath(), LEGACY_DESKTOP()]) {
+        removeFromJson(desktop, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
+        console.log(`✓ Removido do Claude Desktop  → ${desktop}`);
+      }
       const cli = join(homedir(), ".claude.json");
       removeFromJson(cli, (d) => { if (d.mcpServers) delete (d.mcpServers as any)[KEY]; });
       console.log(`✓ Removido do Claude Code     → ${cli}`);

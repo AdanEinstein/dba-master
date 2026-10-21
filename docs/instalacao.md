@@ -128,7 +128,7 @@ claude mcp add dba-master -- node /caminho/para/dba-master/dist/index.js
 claude mcp add dba-master -- npx tsx /caminho/para/dba-master/src/index.ts
 ```
 
-Claude Desktop, em `claude_desktop_config.json`:
+Claude Desktop, em `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`; Windows: `%APPDATA%\Claude\`; Linux: `~/.config/Claude/`). Reinicie o Desktop depois. Instalação automática: `npx -y dba-master@latest install --agents claude -g`.
 
 ```json
 {
