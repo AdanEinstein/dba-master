@@ -28,15 +28,16 @@ const CONNECT_EXAMPLE: Record<string, string> = {
   oracle: "localhost:1521/ORCL",
   postgres: "postgresql://user:senha@localhost:5432/db",
   mysql: "mysql://user:senha@localhost:3306/db",
-  sqlserver: "Server=localhost,1433;Database=db",
+  sqlserver: "sqlserver://user:senha@localhost:1433/db?trustServerCertificate=true",
 };
+const ENGINE_LABEL: Record<string, string> = { postgres: "PostgreSQL", mysql: "MySQL", sqlserver: "SQL Server" };
 const connectExample = (engine: string) => CONNECT_EXAMPLE[engine] ?? CONNECT_EXAMPLE.oracle;
 
 const ENGINE_OPTIONS = [
   { value: "oracle", label: "Oracle Database", hint: "usuário + senha + host:porta/serviço" },
   { value: "postgres", label: "PostgreSQL", hint: "tudo numa URL" },
   { value: "mysql", label: "MySQL / MariaDB", hint: "tudo numa URL" },
-  { value: "sqlserver", label: "SQL Server (em breve)", disabled: true },
+  { value: "sqlserver", label: "SQL Server", hint: "tudo numa URL" },
 ];
 
 // Esconde a senha embutida em URLs (postgresql://u:SENHA@h) ao exibir na tela.
@@ -329,7 +330,7 @@ async function connectionWizard(name: string, prev?: any): Promise<any> {
     const pw = must(await promptPassword({ message: cur("password") ? "Senha (enter mantém a atual):" : "Senha:" }));
     password = pw || cur("password");
   } else {
-    log.info(`${engine === "postgres" ? "PostgreSQL" : "MySQL"}: usuário e senha vão dentro da própria URL.`);
+    log.info(`${ENGINE_LABEL[engine] ?? engine}: usuário e senha vão dentro da própria URL.`);
   }
   let connectString = await ask(`${isOracle ? "String de conexão" : "URL de conexão"} (ex: ${connectExample(engine)}):`, cur("connectString"));
 
@@ -627,7 +628,7 @@ function configureFast(v: {
 }): void {
   const { name, engine } = v;
   if (!name || !engine || !v["connect-string"]) throw new Error("Modo rápido do configure exige --name, --engine e --connect-string.");
-  if (!["oracle", "postgres", "mysql"].includes(engine)) throw new Error(`--engine inválido: ${engine}. Válidos: oracle, postgres, mysql.`);
+  if (!["oracle", "postgres", "mysql", "sqlserver"].includes(engine)) throw new Error(`--engine inválido: ${engine}. Válidos: oracle, postgres, mysql, sqlserver.`);
   const isOracle = engine === "oracle";
   if (isOracle && !v.user) throw new Error("Oracle exige --user.");
   if (!isOracle && (v.user || v.password)) throw new Error(`${engine}: usuário e senha vão na própria URL do --connect-string.`);

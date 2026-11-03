@@ -51,8 +51,8 @@ Comandos disponíveis:
   configure    Gerencia as credenciais e configurações de banco de dados (connections.json).
                Com flags, cria/atualiza uma conexão sem prompts:
                  --name <nome>           Nome da conexão
-                 --engine <e>            oracle | postgres | mysql
-                 --connect-string <cs>   String/URL de conexão (postgres/mysql: credenciais na URL)
+                 --engine <e>            oracle | postgres | mysql | sqlserver
+                 --connect-string <cs>   String/URL de conexão (postgres/mysql/sqlserver: credenciais na URL)
                  --user <u>              (Oracle) Usuário
                  --password <p>          (Oracle) Senha
                  --thick                 (Oracle) Thick mode

@@ -30,6 +30,10 @@ function createTunnel(cfg: TunnelConfig): Tunnel {
   }
 }
 
+const DEFAULT_PORTS: Record<string, number> = {
+  mysql: 3306, mariadb: 3306, sqlserver: 1433, mssql: 1433,
+};
+
 // Extrai host:port do connectString. Postgres = URL; Oracle = EZConnect host:port/service.
 export function parseEndpoint(engine: string, connectString: string): Endpoint {
   if (engine === "oracle") {
@@ -41,7 +45,8 @@ export function parseEndpoint(engine: string, connectString: string): Endpoint {
   // Postgres: postgresql://user:pass@host:port/db
   // MySQL: mysql://user:pass@host:port/db
   const u = new URL(connectString);
-  const defaultPort = engine === "mysql" ? 3306 : 5432;
+  // SQL Server: sqlserver://user:pass@host:1433/db
+  const defaultPort = DEFAULT_PORTS[engine] ?? 5432;
   return { host: u.hostname, port: u.port ? Number(u.port) : defaultPort };
 }
 

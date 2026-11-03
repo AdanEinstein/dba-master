@@ -33,7 +33,7 @@ linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern
 | `generate_interfaces` | Compila em lote: gera/atualiza a interface `.ts` de **todas** as tabelas (e views) do schema. Devolve contagens + `cacheDir` (sem lista de arquivos) | `schema?`, `includeViews?`, `force?` |
 | `get_relationships` | Grafo de FKs: `outgoing` (FKs da tabela) e `incoming` (quem a referencia), cada um em bloco colunar | `table`, `schema?` |
 | `infer_relationships` | FKs **implícitas** (não declaradas) inferidas por convenção de nome, com `confidence` (high/medium) e `evidence` — para banco legado | `schema?`, `limit?` |
-| `get_ddl` | DDL de objetos. Oracle: via `DBMS_METADATA`. Postgres: table (reconstruída), view e function. MySQL: table e view (nativo) | `name`, `schema?`, `objectType?` |
+| `get_ddl` | DDL de objetos. Oracle: via `DBMS_METADATA`. Postgres: table (reconstruída), view e function. MySQL: table e view (nativo). SQL Server: table (reconstruída), view, procedure, function e trigger (`OBJECT_DEFINITION`) | `name`, `schema?`, `objectType?` |
 | `list_procedures` | Procedures/functions standalone com assinatura de parâmetros (nome, tipo, IN/OUT) | `schema?`, `pattern?`, `limit?` |
 | `list_packages` | Packages e seus subprogramas, cada um com assinatura | `schema?`, `pattern?`, `limit?` |
 | `list_schedulers_jobs` | Jobs agendados (ação, agendamento, estado, próxima execução) | `schema?`, `pattern?`, `limit?` |
@@ -57,8 +57,8 @@ linhas existiam) e `truncated: true`. Para ver o resto: refine `schema`/`pattern
 
 Recursos que variam por banco (`list_packages`, `list_schedulers_jobs`) trazem um campo
 `supported`. Se o banco atual não tem o recurso, a resposta é `{ "supported": false, "engine": ... }`
-— sem erro e sem bloco colunar. No Oracle, ambos são `true`. No PostgreSQL, ambos são `false`
-(não há packages PL/SQL nem scheduler nativo). No MySQL, `list_packages` é `false` mas
+— sem erro e sem bloco colunar. No Oracle, ambos são `true`. No PostgreSQL e no SQL Server, ambos são `false`
+(não há packages PL/SQL nem scheduler acessível). No MySQL, `list_packages` é `false` mas
 `list_schedulers_jobs` é `true` (mapeado para MySQL Events).
 
 ## `run_sql` e o modo read-only

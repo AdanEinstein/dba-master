@@ -1,7 +1,7 @@
 {
   "name": "dba-master",
   "version": "1.0.4",
-  "description": "MCP server para introspecção profunda de bancos de dados (Oracle, PostgreSQL, MySQL/MariaDB), voltado a consumo por agentes de IA e LLMs",
+  "description": "MCP server para introspecção profunda de bancos de dados (Oracle, PostgreSQL, MySQL/MariaDB, SQL Server), voltado a consumo por agentes de IA e LLMs",
   "type": "module",
   "bin": {
     "dba-master": "dist/src/index.js"
@@ -31,6 +31,8 @@
     "postgresql",
     "mysql",
     "mariadb",
+    "sqlserver",
+    "mssql",
     "dba",
     "schema",
     "database",
@@ -45,6 +47,7 @@
     "@clack/prompts": "^1.6.0",
     "@modelcontextprotocol/server": "^2.0.0-beta.1",
     "cfonts": "^3.3.1",
+    "mssql": "^11.0.2",
     "mysql2": "^3.22.5",
     "oracledb": "^7.0.0",
     "pg": "^8.22.0",
@@ -53,11 +56,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "tsx": "^4.22.4",
+    "@types/mssql": "^12.3.0",
     "@types/node": "^26.1.0",
     "@types/oracledb": "^7.0.1",
     "@types/pg": "^8.20.0",
-    "@types/ssh2": "^1.15.5"
+    "@types/ssh2": "^1.15.5",
+    "tsx": "^4.22.4"
   },
   "repository": {
     "type": "git",

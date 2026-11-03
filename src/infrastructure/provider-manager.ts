@@ -3,6 +3,7 @@ import type { DatabaseProvider } from "../domain/database-provider.js";
 import { OracleProvider } from "./oracle/oracle-provider.js";
 import { PgProvider } from "./postgres/pg-provider.js";
 import { MysqlProvider } from "./mysql/mysql-provider.js";
+import { SqlServerProvider } from "./sqlserver/sqlserver-provider.js";
 
 // Gerencia múltiplas conexões
 export class ProviderManager {
@@ -25,8 +26,11 @@ export class ProviderManager {
       case "mysql":
       case "mariadb":
         return new MysqlProvider(connCfg, globalCfg);
+      case "sqlserver":
+      case "mssql":
+        return new SqlServerProvider(connCfg, globalCfg);
       default:
-        throw new Error(`Engine de banco não suportado ainda: '${connCfg.engine}'. Suportados: oracle, postgres, mysql.`);
+        throw new Error(`Engine de banco não suportado ainda: '${connCfg.engine}'. Suportados: oracle, postgres, mysql, sqlserver.`);
     }
   }
 
