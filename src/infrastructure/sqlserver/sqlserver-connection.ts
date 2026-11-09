@@ -7,7 +7,7 @@ import { withTunnel, type Tunnel } from "../tunnel/index.js";
 // Binds nomeados @p1, @p2, ... (posicionais na API: params[0] → @p1).
 
 /** Converte a URL em config do `mssql` (user/password decodificados; fallback para cfg). */
-export function parseSqlServerUrl(connectString: string, cfg: Pick<ConnectionConfig, "user" | "password" | "poolMax">): sql.config {
+export function parseSqlServerUrl(connectString: string, cfg: Pick<ConnectionConfig, "user" | "password" | "poolMax" | "queryTimeoutMs">): sql.config {
   const u = new URL(connectString);
   const flag = (k: string, def: boolean) => {
     const v = u.searchParams.get(k);
@@ -20,6 +20,9 @@ export function parseSqlServerUrl(connectString: string, cfg: Pick<ConnectionCon
     user: u.username ? decodeURIComponent(u.username) : cfg.user || undefined,
     password: u.password ? decodeURIComponent(u.password) : cfg.password || undefined,
     pool: { max: cfg.poolMax ?? DEFAULT_POOL_MAX },
+    // Teto por query: estourou → o tedious manda ATTENTION e o servidor aborta o batch.
+    // 0 desliga no mssql; ausente → default 15s do driver.
+    ...(cfg.queryTimeoutMs !== undefined ? { requestTimeout: cfg.queryTimeoutMs } : {}),
     options: {
       encrypt: flag("encrypt", true),
       trustServerCertificate: flag("trustServerCertificate", false),

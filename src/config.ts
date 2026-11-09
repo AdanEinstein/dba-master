@@ -3,6 +3,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 
 export const DEFAULT_POOL_MAX = 8;
+// Teto por query (ms). Sem ele, SQL ruim gerado pelo agente roda sem fim no banco. 0 = sem teto.
+export const DEFAULT_QUERY_TIMEOUT_MS = 60_000;
 
 // Transporte opcional: quando o banco só é acessível via bastion/proxy, o driver
 // disca numa porta local que a camada tunnel/ encaminha até o destino real. Os
@@ -38,6 +40,7 @@ export interface ConnectionConfig {
   thick?: boolean;
   clientLibDir?: string;
   poolMax?: number;
+  queryTimeoutMs?: number;
   readOnly?: boolean;
   schemaFilter?: string[];
   tunnel?: TunnelConfig;
@@ -89,6 +92,7 @@ export function resolveConnection(name: string, c: ConnectionConfig): Connection
   if (c.clientLibDir) c.clientLibDir = interpolateEnv(c.clientLibDir, name, "clientLibDir");
   if (c.tunnel) interpolateTunnel(c.tunnel, name);
   c.poolMax ??= DEFAULT_POOL_MAX;
+  c.queryTimeoutMs ??= DEFAULT_QUERY_TIMEOUT_MS;
   c.readOnly ??= true;
   c.schemaFilter ??= [];
   return c;

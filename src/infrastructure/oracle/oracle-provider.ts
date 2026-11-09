@@ -7,7 +7,7 @@ import type {
 } from "../../domain/types.js";
 import { OracleConnection } from "./oracle-connection.js";
 import { parsePlsqlSource, alterCompileSql } from "./plsql-source.js";
-import { OracleQueries, type ColumnRow, type FkRow, type IndexRow, type CheckRow } from "./oracle-queries.js";
+import { OracleQueries, type ColumnRow, type FkRow, type IndexRow, type CheckRow, type ArgumentRow } from "./oracle-queries.js";
 
 // Adapter Oracle: implementa o port DatabaseProvider usando node-oracledb.
 // Concentra o que é específico do Oracle: driver, SQL ALL_*/DBMS_METADATA e mapeamento de tipos.
@@ -131,39 +131,46 @@ export class OracleProvider implements DatabaseProvider {
     return { owner, objectName: obj, objectType: type, ddl };
   }
 
-  async listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]> {
+  // Argumentos/subprogramas: 1-2 queries em lote, só p/ os `limit` primeiros (os que a tool mostra).
+  // Os demais voltam sem detalhe — a tool os corta, mas a contagem total continua certa.
+  async listProcedures(schema?: string, pattern?: string, limit?: number): Promise<ProcedureRef[]> {
     const rows = await this.q.findRoutines(schema, pattern);
-    const out: ProcedureRef[] = [];
-    for (const r of rows) {
-      out.push({
-        owner: r.OWNER,
-        name: r.OBJECT_NAME,
-        packageName: null,
-        objectType: r.OBJECT_TYPE as "PROCEDURE" | "FUNCTION",
-        arguments: await this.loadArguments(r.OWNER, r.OBJECT_NAME, null),
-      });
-    }
-    return out;
+    const head = rows.slice(0, limit ?? rows.length);
+    const args = groupBy(
+      await this.q.findArguments(head.map((r) => r.OWNER), head.map((r) => r.OBJECT_NAME), false),
+      (a) => `${a.OWNER}|${a.OBJECT_NAME}`,
+    );
+    return rows.map((r) => ({
+      owner: r.OWNER,
+      name: r.OBJECT_NAME,
+      packageName: null,
+      objectType: r.OBJECT_TYPE as "PROCEDURE" | "FUNCTION",
+      arguments: mapArguments(args.get(`${r.OWNER}|${r.OBJECT_NAME}`)),
+    }));
   }
 
-  async listPackages(schema?: string, pattern?: string): Promise<PackageRef[]> {
+  async listPackages(schema?: string, pattern?: string, limit?: number): Promise<PackageRef[]> {
     const pkgs = await this.q.findPackages(schema, pattern);
-    const out: PackageRef[] = [];
-    for (const p of pkgs) {
-      const subs = await this.q.findPackageSubprograms(p.OWNER, p.OBJECT_NAME);
-      const subprograms: ProcedureRef[] = [];
-      for (const s of subs) {
-        subprograms.push({
-          owner: p.OWNER,
-          name: s.PROCEDURE_NAME,
-          packageName: p.OBJECT_NAME,
-          objectType: "PROCEDURE", // ALL_PROCEDURES não distingue func/proc de forma confiável
-          arguments: await this.loadArguments(p.OWNER, s.PROCEDURE_NAME, p.OBJECT_NAME),
-        });
-      }
-      out.push({ owner: p.OWNER, name: p.OBJECT_NAME, subprograms });
-    }
-    return out;
+    const head = pkgs.slice(0, limit ?? pkgs.length);
+    const owners = head.map((p) => p.OWNER);
+    const names = head.map((p) => p.OBJECT_NAME);
+    const [subs, args] = await Promise.all([
+      this.q.findPackageSubprograms(owners, names),
+      this.q.findArguments(owners, names, true),
+    ]);
+    const subsBy = groupBy(subs, (s) => `${s.OWNER}|${s.OBJECT_NAME}`);
+    const argsBy = groupBy(args, (a) => `${a.OWNER}|${a.PACKAGE_NAME}|${a.OBJECT_NAME}`);
+    return pkgs.map((p) => ({
+      owner: p.OWNER,
+      name: p.OBJECT_NAME,
+      subprograms: (subsBy.get(`${p.OWNER}|${p.OBJECT_NAME}`) ?? []).map((s) => ({
+        owner: p.OWNER,
+        name: s.PROCEDURE_NAME,
+        packageName: p.OBJECT_NAME,
+        objectType: "PROCEDURE" as const, // ALL_PROCEDURES não distingue func/proc de forma confiável
+        arguments: mapArguments(argsBy.get(`${p.OWNER}|${p.OBJECT_NAME}|${s.PROCEDURE_NAME}`)),
+      })),
+    }));
   }
 
   async listScheduledJobs(schema?: string, pattern?: string): Promise<ScheduledJob[]> {
@@ -279,19 +286,19 @@ export class OracleProvider implements DatabaseProvider {
       );
     return rows[0].OWNER;
   }
-
-  private async loadArguments(owner: string, objectName: string, packageName: string | null): Promise<ArgumentInfo[]> {
-    const rows = await this.q.findArguments(owner, objectName, packageName);
-    return rows.map((r) => ({
-      name: r.ARGUMENT_NAME,
-      position: r.POSITION,
-      dataType: r.DATA_TYPE,
-      inOut: r.IN_OUT,
-    }));
-  }
 }
 
 // --- Colunas / FKs / índices (linhas Oracle → DTO) ------------------------
+
+function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const r of rows) (m.get(key(r)) ?? m.set(key(r), []).get(key(r))!).push(r);
+  return m;
+}
+
+function mapArguments(rows: ArgumentRow[] = []): ArgumentInfo[] {
+  return rows.map((r) => ({ name: r.ARGUMENT_NAME, position: r.POSITION, dataType: r.DATA_TYPE, inOut: r.IN_OUT }));
+}
 
 /** Mapeia linhas de all_tab_columns → ColumnInfo. Usado por tabelas e views. */
 function mapColumns(cols: ColumnRow[]): ColumnInfo[] {

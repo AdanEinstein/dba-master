@@ -33,7 +33,10 @@ export function errorResult(err: unknown) {
  * Corta ~50% dos tokens de uma listagem grande. Aplica teto e sinaliza o corte.
  * ponytail: sem cursor — refine schema/pattern ou suba limit.
  */
-export function tabular(rows: readonly object[], limit = 200) {
+/** Teto padrão das listagens (tabular e providers que só detalham o que vai ser mostrado). */
+export const DEFAULT_LIMIT = 200;
+
+export function tabular(rows: readonly object[], limit = DEFAULT_LIMIT) {
   const shown = rows.slice(0, limit) as Record<string, unknown>[];
   // União das chaves: providers podem omitir campos opcionais em algumas linhas.
   const cols = [...new Set(shown.flatMap((r) => Object.keys(r)))];

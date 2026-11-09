@@ -93,9 +93,19 @@ serveStdio(() => {
   return server;
 });
 
-for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.on(sig, async () => {
-    await providerManager.closeAll();
-    process.exit(0);
-  });
+// Encerra quando o cliente some. O transport stdio do SDK só escuta `data`/`error`: se o
+// agente fecha o pipe sem sinal (crash, reload, janela fechada), pools/túneis/query em voo
+// mantinham o Node vivo para sempre — e a query rodando no banco.
+let shuttingDown = false;
+async function shutdown(code = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  // pool.end() espera a query em voo devolver a conexão: query presa travaria o shutdown.
+  setTimeout(() => process.exit(code), 5000).unref();
+  await providerManager.closeAll().catch(() => {});
+  process.exit(code);
 }
+
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(sig, () => void shutdown());
+process.stdin.on("end", () => void shutdown());
+process.stdin.on("close", () => void shutdown());

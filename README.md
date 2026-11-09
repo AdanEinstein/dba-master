@@ -77,7 +77,7 @@ npx -y dba-master@latest configure --name ora --engine oracle --user scott --pas
 npx -y dba-master@latest uninstall --agents all -g --purge          # --purge apaga .dba-master + env vars
 ```
 
-`configure` com flags cria/atualiza uma conexão (preserva `poolMax`, `schemaFilter` e `tunnel` já existentes;
+`configure` com flags cria/atualiza uma conexão (preserva `poolMax`, `queryTimeoutMs`, `schemaFilter` e `tunnel` já existentes;
 túnel só pela TUI). Sem `--writable`, a conexão é read-only. `--env-ref` grava as credenciais como
 `${DBA_<CONN>_*}` no rc do shell em vez de texto plano no `connections.json`. Senha passada em flag fica no
 histórico do shell — prefira a TUI para segredos sensíveis. Lista completa: `npx -y dba-master@latest help`.
@@ -129,6 +129,7 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
     "connectString": "${DBA_PROD_CS}",
     "thick": false,
     "poolMax": 8,
+    "queryTimeoutMs": 60000,
     "readOnly": true,
     "schemaFilter": ["APP"]
   },
@@ -143,7 +144,7 @@ O `dba-master` lê as conexões **exclusivamente** de um arquivo `connections.js
 
 Os valores também podem ser gravados em texto plano direto no JSON (menos seguro). Se uma `${VAR}` referenciada não existir no ambiente, o server falha no boot nomeando a var. No Postgres, `user`/`password` vêm embutidos na URL da `connectString` (como no exemplo `pg` acima).
 
-Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). O `configure` também pergunta, por conexão, se ela aceita escrita (`readOnly: false`; default não) — e a opção "Definir quais conexões aceitam escrita" troca isso em uma tela só, sem repassar credenciais. Para ajustar `schemaFilter`/`poolMax`, edite o JSON manualmente. Campos por conexão:
+Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master@latest configure` (ou `install`). O `configure` também pergunta, por conexão, se ela aceita escrita (`readOnly: false`; default não) — e a opção "Definir quais conexões aceitam escrita" troca isso em uma tela só, sem repassar credenciais. Para ajustar `schemaFilter`/`poolMax`/`queryTimeoutMs`, edite o JSON manualmente. Campos por conexão:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
@@ -153,6 +154,7 @@ Normalmente o arquivo é gravado pelos prompts interativos de `npx -y dba-master
 | `thick` | não | **Só Oracle.** `false` (default) usa modo thin; `true` exige Instant Client |
 | `clientLibDir` | não | **Só Oracle.** Libs do client (só thick, caminho não-padrão) |
 | `poolMax` | não | Tamanho máximo do pool (default `8`) |
+| `queryTimeoutMs` | não | Teto por query em ms (default `60000`; `0` = sem teto). Oracle: `callTimeout`; Postgres: `statement_timeout`; MySQL: `max_execution_time`/`max_statement_time` + timeout do driver; SQL Server: `requestTimeout`. Scripts de deploy do `compile_object` não têm teto |
 | `readOnly` | não | `true` (default) bloqueia escrita no `run_sql`, `compile_object` e os `*_kill_session` **desta conexão**; só `false` (booleano) libera. Leitura sempre liberada |
 | `schemaFilter` | não | Array de schemas; vazio (`[]`, default) = todos os schemas de usuário. Oracle: nomes em MAIÚSCULO (exclui os mantidos pela Oracle); Postgres: nomes como `public` (exclui `pg_*` e `information_schema`) |
 | `tunnel` | não | Túnel/proxy quando o banco só é acessível via bastion. Ver abaixo |
