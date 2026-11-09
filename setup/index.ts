@@ -344,7 +344,7 @@ async function connectionWizard(name: string, prev?: any): Promise<any> {
   if (!isRef(connectString)) cand.push({ field: "CS", val: connectString, set: r => (connectString = r) });
   await offerEnvRefs(name, cand);
 
-  // poolMax/schemaFilter não têm prompt: preserva o que já estava no JSON.
+  // poolMax/queryTimeoutMs/schemaFilter não têm prompt: preserva o que já estava no JSON.
   return {
     engine,
     user: user ?? "",
@@ -353,6 +353,7 @@ async function connectionWizard(name: string, prev?: any): Promise<any> {
     ...thick,
     ...writable,
     ...(prev?.poolMax !== undefined ? { poolMax: prev.poolMax } : {}),
+    ...(prev?.queryTimeoutMs !== undefined ? { queryTimeoutMs: prev.queryTimeoutMs } : {}),
     ...(prev?.schemaFilter !== undefined ? { schemaFilter: prev.schemaFilter } : {}),
     ...(tunnel ? { tunnel } : {})
   };
@@ -665,6 +666,7 @@ function configureFast(v: {
     ...(isOracle && v["client-lib-dir"] ? { clientLibDir: v["client-lib-dir"] } : {}),
     readOnly: !v.writable,
     ...(prev.poolMax !== undefined ? { poolMax: prev.poolMax } : {}),
+    ...(prev.queryTimeoutMs !== undefined ? { queryTimeoutMs: prev.queryTimeoutMs } : {}),
     ...(prev.schemaFilter !== undefined ? { schemaFilter: prev.schemaFilter } : {}),
     ...(prev.tunnel ? { tunnel: prev.tunnel } : {})
   };

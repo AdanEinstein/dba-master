@@ -5,14 +5,21 @@ import { withTunnel, type Tunnel } from "../tunnel/index.js";
 // Conexão específica do Oracle: pool node-oracledb e execução de queries cruas.
 
 export class OracleConnection {
-  private pool: oracledb.Pool | undefined;
+  private pool: Promise<oracledb.Pool> | undefined;
   private tunnel: Tunnel | null = null;
 
   constructor(private readonly cfg: ConnectionConfig) {}
 
-  private async getPool(): Promise<oracledb.Pool> {
-    if (this.pool) return this.pool;
+  // Promise memoizada: chamadas simultâneas na 1ª vez (Promise.all, generate com N workers)
+  // compartilham UM pool/túnel. Falha não "gruda": a próxima chamada tenta de novo.
+  private getPool(): Promise<oracledb.Pool> {
+    return (this.pool ??= this.openPool().catch((e) => {
+      this.pool = undefined;
+      throw e;
+    }));
+  }
 
+  private async openPool(): Promise<oracledb.Pool> {
     if (this.cfg.thick) {
       oracledb.initOracleClient(this.cfg.clientLibDir ? { libDir: this.cfg.clientLibDir } : {});
     }
@@ -24,15 +31,19 @@ export class OracleConnection {
     // para a porta local do túnel; senão passthrough.
     const { connectString, tunnel } = await withTunnel(this.cfg);
     this.tunnel = tunnel;
-
-    this.pool = await oracledb.createPool({
-      user: this.cfg.user,
-      password: this.cfg.password,
-      connectString,
-      poolMin: 0,
-      poolMax: this.cfg.poolMax ?? DEFAULT_POOL_MAX,
-    });
-    return this.pool;
+    try {
+      return await oracledb.createPool({
+        user: this.cfg.user,
+        password: this.cfg.password,
+        connectString,
+        poolMin: 0,
+        poolMax: this.cfg.poolMax ?? DEFAULT_POOL_MAX,
+      });
+    } catch (e) {
+      await this.tunnel?.close();
+      this.tunnel = null;
+      throw e;
+    }
   }
 
   /** Executa uma query e devolve as linhas como objetos tipados. */
@@ -43,6 +54,8 @@ export class OracleConnection {
   ): Promise<T[]> {
     const pool = await this.getPool();
     const conn = await pool.getConnection();
+    // Teto por round-trip: estourou → o driver interrompe a chamada no servidor (break).
+    if (this.cfg.queryTimeoutMs) conn.callTimeout = this.cfg.queryTimeoutMs;
     try {
       const r = await conn.execute<T>(sql, binds as oracledb.BindParameters, { ...opts });
       return r.rows ?? [];
@@ -54,6 +67,7 @@ export class OracleConnection {
   /**
    * Várias execuções numa sessão só: ALTER SESSION (CURRENT_SCHEMA etc.) vale p/ as seguintes.
    * autoCommit: DML de script de deploy persiste (query() devolve a conexão ao pool sem commit).
+   * ponytail: sem callTimeout — script de deploy (CREATE INDEX etc.) pode passar do teto legítimo.
    */
   async session<T>(fn: (exec: <R>(sql: string) => Promise<R[]>) => Promise<T>): Promise<T> {
     const conn = await (await this.getPool()).getConnection();
@@ -65,10 +79,9 @@ export class OracleConnection {
   }
 
   async close(): Promise<void> {
-    if (this.pool) {
-      await this.pool.close(5);
-      this.pool = undefined;
-    }
+    const pool = await this.pool?.catch(() => undefined);
+    this.pool = undefined;
+    await pool?.close(5);
     await this.tunnel?.close();
     this.tunnel = null;
   }

@@ -53,8 +53,12 @@ export interface DatabaseProvider {
   /** Descreve a view: colunas + o SELECT que a define. */
   describeView(view: string, schema?: string): Promise<ViewSchema>;
   getDdl(name: string, schema?: string, objectType?: string): Promise<DdlResult>;
-  listProcedures(schema?: string, pattern?: string): Promise<ProcedureRef[]>;
-  listPackages(schema?: string, pattern?: string): Promise<PackageRef[]>;
+  /**
+   * `limit`: só os primeiros `limit` itens precisam vir detalhados (argumentos/subprogramas) —
+   * a tool corta o resto. Evita varrer o dicionário inteiro p/ mostrar 200 linhas. Opcional por engine.
+   */
+  listProcedures(schema?: string, pattern?: string, limit?: number): Promise<ProcedureRef[]>;
+  listPackages(schema?: string, pattern?: string, limit?: number): Promise<PackageRef[]>;
   listScheduledJobs(schema?: string, pattern?: string): Promise<ScheduledJob[]>;
   /** Executa SQL cru, sem guarda de escrita (a política read-only fica na tool). */
   runSql(sql: string, maxRows?: number): Promise<RunSqlResult>;

@@ -18,6 +18,7 @@ export interface FkRow {
 export interface IndexRow { INDEX_NAME: string; UNIQUENESS: string; COLUMN_NAME: string }
 export interface RoutineRow { OWNER: string; OBJECT_NAME: string; OBJECT_TYPE: string }
 export interface ArgumentRow {
+  OWNER: string; PACKAGE_NAME: string | null; OBJECT_NAME: string;
   ARGUMENT_NAME: string | null; POSITION: number; DATA_TYPE: string | null; IN_OUT: string;
 }
 export interface JobRow {
@@ -316,27 +317,48 @@ export class OracleQueries {
     );
   }
 
-  findPackageSubprograms(owner: string, pkg: string): Promise<{ PROCEDURE_NAME: string }[]> {
-    return this.conn.query<{ PROCEDURE_NAME: string }>(
-      `SELECT DISTINCT procedure_name
+  /** Subprogramas de vários packages de uma vez (antes: 1 query por package). */
+  findPackageSubprograms(owners: string[], pkgs: string[]): Promise<{ OWNER: string; OBJECT_NAME: string; PROCEDURE_NAME: string }[]> {
+    return this.byNames(owners, pkgs, (own, names) =>
+      `SELECT DISTINCT owner, object_name, procedure_name
          FROM all_procedures
-        WHERE owner = :owner AND object_name = :pkg AND procedure_name IS NOT NULL
-        ORDER BY procedure_name`,
-      { owner, pkg },
+        WHERE owner IN (${own}) AND object_name IN (${names}) AND procedure_name IS NOT NULL
+        ORDER BY owner, object_name, procedure_name`,
     );
   }
 
-  findArguments(owner: string, objectName: string, packageName: string | null): Promise<ArgumentRow[]> {
-    return this.conn.query<ArgumentRow>(
-      `SELECT argument_name, position, data_type, in_out
+  /**
+   * Argumentos de vários objetos de uma vez (antes: 1 query em ALL_ARGUMENTS por rotina —
+   * dezenas de milhares num legado). byPackage: `names` são packages; senão, rotinas standalone.
+   */
+  findArguments(owners: string[], names: string[], byPackage: boolean): Promise<ArgumentRow[]> {
+    return this.byNames(owners, names, (own, inNames) =>
+      `SELECT owner, package_name, object_name, argument_name, position, data_type, in_out
          FROM all_arguments
-        WHERE owner = :owner
-          AND object_name = :obj
-          AND ${packageName ? "package_name = :pkg" : "package_name IS NULL"}
+        WHERE owner IN (${own})
+          AND ${byPackage ? `package_name IN (${inNames})` : `package_name IS NULL AND object_name IN (${inNames})`}
           AND data_level = 0
-        ORDER BY position`,
-      packageName ? { owner, obj: objectName, pkg: packageName } : { owner, obj: objectName },
+        ORDER BY owner, package_name, object_name, position`,
     );
+  }
+
+  /**
+   * Roda `sql` com binds IN p/ owners e nomes, em lotes de 1000 nomes (teto do IN no Oracle).
+   * owner × nome pode casar par extra (mesmo nome em outro owner da lista) — o chamador agrupa
+   * por chave owner|nome e o par extra cai fora. ponytail: owners distintos > 1000 estoura o IN.
+   */
+  private async byNames<T>(owners: string[], names: string[], sql: (own: string, names: string) => string): Promise<T[]> {
+    const own = [...new Set(owners)];
+    const uniq = [...new Set(names)];
+    const ownBinds = Object.fromEntries(own.map((o, i) => [`o${i}`, o]));
+    const ownIn = own.map((_, i) => `:o${i}`).join(", ");
+    const out: T[] = [];
+    for (let i = 0; i < uniq.length; i += 1000) {
+      const chunk = uniq.slice(i, i + 1000);
+      const binds = { ...ownBinds, ...Object.fromEntries(chunk.map((n, j) => [`n${j}`, n])) };
+      out.push(...(await this.conn.query<T>(sql(ownIn, chunk.map((_, j) => `:n${j}`).join(", ")), binds)));
+    }
+    return out;
   }
 
   findSchedulerJobs(schema?: string, pattern?: string): Promise<JobRow[]> {

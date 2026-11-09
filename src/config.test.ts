@@ -3,7 +3,7 @@ import assert from "node:assert";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { loadConfig, DEFAULT_POOL_MAX } from "./config.js";
+import { loadConfig, DEFAULT_POOL_MAX, DEFAULT_QUERY_TIMEOUT_MS } from "./config.js";
 
 // loadConfig lê ./.dba-master/connections.json (cwd) ou ~/.dba-master/connections.json.
 // Isolamos ambos via cwd temporário + HOME temporário (os.homedir() usa $HOME no POSIX),
@@ -38,6 +38,7 @@ describe("loadConfig — connections.json como fonte única", () => {
     sandbox({ dev: { engine: "oracle", user: "u", connectString: "host/svc" } });
     const { connections } = loadConfig();
     assert.strictEqual(connections.dev.poolMax, DEFAULT_POOL_MAX);
+    assert.strictEqual(connections.dev.queryTimeoutMs, DEFAULT_QUERY_TIMEOUT_MS);
     assert.strictEqual(connections.dev.readOnly, true);
     assert.deepStrictEqual(connections.dev.schemaFilter, []);
   });
